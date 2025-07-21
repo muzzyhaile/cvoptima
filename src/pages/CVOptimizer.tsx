@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import * as mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { 
   FileText, 
   Upload, 
@@ -37,11 +40,15 @@ const CVOptimizer = () => {
   const [currentStep, setCurrentStep] = useState<Step>("upload");
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [cvText, setCvText] = useState("");
+  const [cvHtml, setCvHtml] = useState("");
+  const [originalFileName, setOriginalFileName] = useState("");
   const [jobUrl, setJobUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [optimizedCV, setOptimizedCV] = useState("");
+  const [optimizedCVHtml, setOptimizedCVHtml] = useState("");
   const [fileError, setFileError] = useState("");
+  const cvPreviewRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -64,14 +71,18 @@ const CVOptimizer = () => {
     }
   };
 
-  const extractTextFromWord = async (file: File): Promise<string> => {
+  const extractFromWord = async (file: File): Promise<{ text: string; html: string }> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      return result.value.trim();
+      const textResult = await mammoth.extractRawText({ arrayBuffer });
+      const htmlResult = await mammoth.convertToHtml({ arrayBuffer });
+      return {
+        text: textResult.value.trim(),
+        html: htmlResult.value
+      };
     } catch (error) {
-      console.error('Error extracting Word document text:', error);
-      throw new Error('Failed to extract text from Word document');
+      console.error('Error extracting Word document:', error);
+      throw new Error('Failed to extract content from Word document');
     }
   };
 
@@ -80,10 +91,12 @@ const CVOptimizer = () => {
     if (file) {
       setFileError("");
       setCvFile(file);
+      setOriginalFileName(file.name.split('.')[0]);
       
       try {
         const fileExtension = file.name.split('.').pop()?.toLowerCase();
         let extractedText = '';
+        let extractedHtml = '';
         
         if (fileExtension === 'txt') {
           // Read plain text files
@@ -91,15 +104,19 @@ const CVOptimizer = () => {
           reader.onload = (e) => {
             const content = e.target?.result as string;
             setCvText(content);
+            setCvHtml(`<div class="cv-content">${content.split('\n').map(line => `<p>${line || '&nbsp;'}</p>`).join('')}</div>`);
           };
           reader.readAsText(file);
-          return; // Exit early for text files
+          return;
         } else if (fileExtension === 'pdf') {
           // Set PDF.js worker
           pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
           extractedText = await extractTextFromPDF(file);
+          extractedHtml = `<div class="cv-content">${extractedText.split('\n').map(line => `<p>${line || '&nbsp;'}</p>`).join('')}</div>`;
         } else if (fileExtension === 'docx' || fileExtension === 'doc') {
-          extractedText = await extractTextFromWord(file);
+          const wordContent = await extractFromWord(file);
+          extractedText = wordContent.text;
+          extractedHtml = wordContent.html;
         } else {
           setFileError("Unsupported file format. Please upload a TXT, PDF, DOC, or DOCX file.");
           setCvFile(null);
@@ -107,6 +124,7 @@ const CVOptimizer = () => {
         }
         
         setCvText(extractedText);
+        setCvHtml(extractedHtml);
         
         toast({
           title: "CV Uploaded Successfully",
@@ -118,6 +136,7 @@ const CVOptimizer = () => {
         setFileError(`Error processing ${file.name}. Please try a different file or format.`);
         setCvFile(null);
         setCvText("");
+        setCvHtml("");
         
         toast({
           title: "File Processing Failed",
@@ -187,6 +206,7 @@ const CVOptimizer = () => {
       
       setRecommendations(mockRecommendations);
       setOptimizedCV(cvText);
+      setOptimizedCVHtml(cvHtml);
       setIsAnalyzing(false);
       setCurrentStep("results");
     }, 3000);
@@ -199,12 +219,15 @@ const CVOptimizer = () => {
     
     // Update optimized CV
     let updatedCV = cvText;
+    let updatedCVHtml = cvHtml;
     newRecommendations.forEach(rec => {
       if (rec.applied) {
         updatedCV = updatedCV.replace(rec.original, rec.suggested);
+        updatedCVHtml = updatedCVHtml.replace(rec.original, `<strong>${rec.suggested}</strong>`);
       }
     });
     setOptimizedCV(updatedCV);
+    setOptimizedCVHtml(updatedCVHtml);
     
     toast({
       title: newRecommendations[index].applied ? "Change Applied" : "Change Reverted",
@@ -228,14 +251,118 @@ const CVOptimizer = () => {
     }
   };
 
-  const downloadCV = () => {
+  const downloadAsWord = async () => {
+    try {
+      // Create paragraphs from CV content
+      const paragraphs = optimizedCV.split('\n\n').map(paragraph => {
+        const trimmed = paragraph.trim();
+        if (!trimmed) return new Paragraph({ children: [new TextRun(" ")] });
+        
+        // Check if it's likely a heading (short line, all caps, etc.)
+        const isHeading = trimmed.length < 50 && (trimmed === trimmed.toUpperCase() || trimmed.endsWith(':'));
+        
+        return new Paragraph({
+          children: [new TextRun({
+            text: trimmed,
+            bold: isHeading,
+            size: isHeading ? 28 : 24
+          })],
+          heading: isHeading ? HeadingLevel.HEADING_2 : undefined,
+          spacing: { after: isHeading ? 240 : 120 }
+        });
+      });
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: paragraphs
+        }]
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+      const element = document.createElement('a');
+      element.href = URL.createObjectURL(blob);
+      element.download = `${originalFileName || 'optimized-cv'}.docx`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      toast({
+        title: "CV downloaded as Word",
+        description: "Your optimized CV has been downloaded as a Word document.",
+      });
+    } catch (error) {
+      console.error('Error creating Word document:', error);
+      toast({
+        title: "Download failed",
+        description: "Failed to create Word document. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadAsPDF = async () => {
+    try {
+      if (!cvPreviewRef.current) return;
+      
+      const canvas = await html2canvas(cvPreviewRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`${originalFileName || 'optimized-cv'}.pdf`);
+      
+      toast({
+        title: "CV downloaded as PDF",
+        description: "Your optimized CV has been downloaded as a PDF.",
+      });
+    } catch (error) {
+      console.error('Error creating PDF:', error);
+      toast({
+        title: "Download failed",
+        description: "Failed to create PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const downloadAsText = () => {
     const element = document.createElement("a");
     const file = new Blob([optimizedCV], { type: "text/plain" });
     element.href = URL.createObjectURL(file);
-    element.download = "optimized-cv.txt";
+    element.download = `${originalFileName || 'optimized-cv'}.txt`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+    
+    toast({
+      title: "CV downloaded as text",
+      description: "Your optimized CV has been downloaded as a text file.",
+    });
   };
 
   const getStepProgress = () => {
@@ -420,22 +547,48 @@ const CVOptimizer = () => {
             <Card className="p-6 shadow-soft overflow-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">CV Preview</h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" onClick={copyToClipboard}>
-                    <Copy className="h-4 w-4 mr-2" />
+                    <Copy className="h-4 w-4 mr-1" />
                     Copy
                   </Button>
-                  <Button size="sm" onClick={downloadCV}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Download
+                  <Button variant="outline" size="sm" onClick={downloadAsWord}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Word
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={downloadAsPDF}>
+                    <Download className="h-4 w-4 mr-1" />
+                    PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={downloadAsText}>
+                    <Download className="h-4 w-4 mr-1" />
+                    Text
                   </Button>
                 </div>
               </div>
               
-              <div className="bg-card border rounded-lg p-6">
-                <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
-                  {optimizedCV}
-                </pre>
+              <div className="bg-white border rounded-lg p-6 min-h-[400px]">
+                <div 
+                  ref={cvPreviewRef}
+                  className="cv-preview-content"
+                  style={{
+                    fontFamily: 'Arial, sans-serif',
+                    lineHeight: '1.6',
+                    color: '#333',
+                    backgroundColor: '#ffffff'
+                  }}
+                >
+                  {optimizedCVHtml ? (
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: optimizedCVHtml }}
+                      className="prose prose-sm max-w-none [&>p]:mb-2 [&>h1]:text-xl [&>h1]:font-bold [&>h1]:mb-3 [&>h2]:text-lg [&>h2]:font-semibold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-medium [&>h3]:mb-1"
+                    />
+                  ) : (
+                    <div className="text-gray-500 text-center py-8">
+                      Your CV content will appear here after processing...
+                    </div>
+                  )}
+                </div>
               </div>
             </Card>
           </div>
@@ -455,7 +608,7 @@ const CVOptimizer = () => {
             CV Optimizer
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Follow our step-by-step process to optimize your CV for any job opportunity
+            Upload your Word CV, get AI recommendations, and download as Word or PDF
           </p>
         </div>
 
