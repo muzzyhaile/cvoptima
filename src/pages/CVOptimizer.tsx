@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import * as mammoth from "mammoth";
+import * as pdfjsLib from "pdfjs-dist";
 import { 
   FileText, 
   Upload, 
@@ -42,71 +44,87 @@ const CVOptimizer = () => {
   const [fileError, setFileError] = useState("");
   const { toast } = useToast();
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const textItems = textContent.items.map((item: any) => item.str);
+        fullText += textItems.join(' ') + '\n';
+      }
+      
+      return fullText.trim();
+    } catch (error) {
+      console.error('Error extracting PDF text:', error);
+      throw new Error('Failed to extract text from PDF file');
+    }
+  };
+
+  const extractTextFromWord = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      return result.value.trim();
+    } catch (error) {
+      console.error('Error extracting Word document text:', error);
+      throw new Error('Failed to extract text from Word document');
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       setFileError("");
       setCvFile(file);
       
-      // Check file type and handle accordingly
-      const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      
-      if (fileExtension === 'txt') {
-        // Read plain text files
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const content = e.target?.result as string;
-          setCvText(content);
-        };
-        reader.readAsText(file);
-      } else if (fileExtension === 'pdf' || fileExtension === 'doc' || fileExtension === 'docx') {
-        // For demo purposes, simulate extracted content for PDF/Word files
-        // In a real implementation, you'd use libraries like pdf-parse or mammoth.js
-        const mockExtractedContent = `John Doe
-Senior Software Engineer
-
-PROFESSIONAL SUMMARY
-Experienced software engineer with 5+ years in web development. Skilled in JavaScript, React, and Node.js. Strong background in agile development methodologies and team collaboration.
-
-WORK EXPERIENCE
-
-Software Engineer | TechCorp Inc. | 2020 - Present
-• Developed and maintained web applications using React and Node.js
-• Collaborated with cross-functional teams to deliver high-quality software
-• Participated in code reviews and maintained coding standards
-• Worked on bug fixes and feature enhancements
-
-Junior Developer | StartupXYZ | 2019 - 2020
-• Built responsive websites using HTML, CSS, and JavaScript
-• Assisted senior developers with various projects
-• Learned best practices in software development
-
-EDUCATION
-Bachelor of Science in Computer Science
-University of Technology | 2019
-
-SKILLS
-• Programming: JavaScript, HTML, CSS, React, Node.js
-• Tools: Git, VS Code, Chrome DevTools
-• Databases: MySQL, MongoDB
-• Other: Agile, Scrum, Problem Solving`;
-
-        setCvText(mockExtractedContent);
+      try {
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+        let extractedText = '';
+        
+        if (fileExtension === 'txt') {
+          // Read plain text files
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const content = e.target?.result as string;
+            setCvText(content);
+          };
+          reader.readAsText(file);
+          return; // Exit early for text files
+        } else if (fileExtension === 'pdf') {
+          // Set PDF.js worker
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+          extractedText = await extractTextFromPDF(file);
+        } else if (fileExtension === 'docx' || fileExtension === 'doc') {
+          extractedText = await extractTextFromWord(file);
+        } else {
+          setFileError("Unsupported file format. Please upload a TXT, PDF, DOC, or DOCX file.");
+          setCvFile(null);
+          return;
+        }
+        
+        setCvText(extractedText);
         
         toast({
-          title: "File Processed",
-          description: `Content extracted from ${file.name}. Note: This is a demo - real implementation would use proper document parsers.`,
+          title: "CV Uploaded Successfully",
+          description: `${file.name} has been processed and your CV content has been extracted.`,
         });
-      } else {
-        setFileError("Unsupported file format. Please upload a TXT, PDF, DOC, or DOCX file.");
+        
+      } catch (error) {
+        console.error('File processing error:', error);
+        setFileError(`Error processing ${file.name}. Please try a different file or format.`);
         setCvFile(null);
-        return;
+        setCvText("");
+        
+        toast({
+          title: "File Processing Failed",
+          description: "Unable to extract text from the uploaded file. Please try a different format.",
+          variant: "destructive",
+        });
       }
-      
-      toast({
-        title: "CV Uploaded Successfully",
-        description: `${file.name} has been uploaded and processed.`,
-      });
     }
   };
 
