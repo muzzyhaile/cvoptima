@@ -1,108 +1,152 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { 
   FileText, 
-  Briefcase, 
+  Upload, 
   Zap, 
   Download, 
   Copy,
   ArrowRight,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  Edit3,
+  Link,
+  ChevronRight
 } from "lucide-react";
 
+type Step = "upload" | "job-url" | "analysis" | "results";
+
+interface Recommendation {
+  type: "keyword" | "phrase" | "structure" | "achievement";
+  original: string;
+  suggested: string;
+  reason: string;
+  applied: boolean;
+}
+
 const CVOptimizer = () => {
+  const [currentStep, setCurrentStep] = useState<Step>("upload");
+  const [cvFile, setCvFile] = useState<File | null>(null);
   const [cvText, setCvText] = useState("");
-  const [jobAdText, setJobAdText] = useState("");
-  const [optimizedCV, setOptimizedCV] = useState("");
+  const [jobUrl, setJobUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<{
-    keywords: string[];
-    improvements: string[];
-    score: number;
-  } | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [optimizedCV, setOptimizedCV] = useState("");
   const { toast } = useToast();
 
-  const analyzeAndOptimize = async () => {
-    if (!cvText.trim() || !jobAdText.trim()) {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setCvFile(file);
+      // Simulate reading file content
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        setCvText(content || "John Doe\nSoftware Engineer\n\nEXPERIENCE\nSoftware Developer at TechCorp\n- Developed web applications\n- Worked with team members\n- Fixed bugs and issues\n\nSKILLS\n- JavaScript\n- HTML/CSS\n- Problem solving");
+      };
+      reader.readAsText(file);
+      
       toast({
-        title: "Missing Information",
-        description: "Please provide both your CV and the job advertisement.",
+        title: "CV Uploaded Successfully",
+        description: `${file.name} has been uploaded and processed.`,
+      });
+    }
+  };
+
+  const proceedToJobUrl = () => {
+    if (!cvFile) {
+      toast({
+        title: "No CV Uploaded",
+        description: "Please upload your CV first.",
         variant: "destructive",
       });
       return;
     }
+    setCurrentStep("job-url");
+  };
 
+  const startAnalysis = () => {
+    if (!jobUrl.trim()) {
+      toast({
+        title: "Missing Job URL",
+        description: "Please provide the job advertisement URL.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setCurrentStep("analysis");
     setIsAnalyzing(true);
     
-    // Simulate AI analysis
+    // Simulate analysis process
     setTimeout(() => {
-      const mockKeywords = ["React", "TypeScript", "Leadership", "Project Management", "Agile"];
-      const mockImprovements = [
-        "Added relevant technical keywords",
-        "Emphasized leadership experience",
-        "Quantified achievements with metrics",
-        "Aligned terminology with job requirements"
+      const mockRecommendations: Recommendation[] = [
+        {
+          type: "keyword",
+          original: "JavaScript",
+          suggested: "React, TypeScript, JavaScript ES6+",
+          reason: "Job requires React and TypeScript specifically",
+          applied: false
+        },
+        {
+          type: "phrase",
+          original: "Worked with team members",
+          suggested: "Collaborated with cross-functional teams of 5+ developers",
+          reason: "More specific and quantified",
+          applied: false
+        },
+        {
+          type: "achievement",
+          original: "Developed web applications",
+          suggested: "Developed 3+ responsive web applications serving 10,000+ users",
+          reason: "Quantified achievements are more impactful",
+          applied: false
+        },
+        {
+          type: "structure",
+          original: "Software Developer",
+          suggested: "Senior Software Engineer | React & TypeScript Specialist",
+          reason: "Matches job title and emphasizes key technologies",
+          applied: false
+        }
       ];
       
-      setAnalysis({
-        keywords: mockKeywords,
-        improvements: mockImprovements,
-        score: 85
-      });
-
-      // Mock optimized CV
-      setOptimizedCV(`OPTIMIZED CV
-
-John Doe
-Senior Software Engineer | React & TypeScript Specialist
-
-PROFESSIONAL SUMMARY
-Results-driven Senior Software Engineer with 5+ years of experience in React and TypeScript development. Proven track record of leading cross-functional teams and delivering high-impact projects using Agile methodologies. Expert in modern front-end technologies with strong project management capabilities.
-
-TECHNICAL SKILLS
-• Frontend: React, TypeScript, JavaScript, HTML5, CSS3
-• Backend: Node.js, Express.js, RESTful APIs
-• Tools: Git, Docker, Jenkins, Jira
-• Methodologies: Agile, Scrum, Test-Driven Development
-
-PROFESSIONAL EXPERIENCE
-
-Senior Software Engineer | TechCorp Inc. | 2020 - Present
-• Led a team of 5 developers in migrating legacy systems to React/TypeScript, improving performance by 40%
-• Implemented Agile practices that reduced development cycle time by 25%
-• Managed project timelines and deliverables for 3 concurrent high-priority initiatives
-• Mentored junior developers and conducted code reviews to maintain quality standards
-
-Software Engineer | StartupXYZ | 2019 - 2020
-• Developed responsive web applications using React and TypeScript
-• Collaborated with cross-functional teams to deliver features on schedule
-• Improved application performance through code optimization and best practices
-
-EDUCATION
-Bachelor of Science in Computer Science | University of Technology | 2019
-
-ACHIEVEMENTS
-• Increased team productivity by 30% through implementation of new development workflows
-• Successfully delivered 15+ projects on time and within budget
-• Recognized as "Employee of the Year" for exceptional leadership and technical contributions`);
-      
+      setRecommendations(mockRecommendations);
+      setOptimizedCV(cvText);
       setIsAnalyzing(false);
-      toast({
-        title: "CV Optimized Successfully!",
-        description: "Your CV has been tailored to match the job requirements.",
-      });
+      setCurrentStep("results");
     }, 3000);
   };
 
-  const copyToClipboard = async (text: string) => {
+  const applyRecommendation = (index: number) => {
+    const newRecommendations = [...recommendations];
+    newRecommendations[index].applied = !newRecommendations[index].applied;
+    setRecommendations(newRecommendations);
+    
+    // Update optimized CV
+    let updatedCV = cvText;
+    newRecommendations.forEach(rec => {
+      if (rec.applied) {
+        updatedCV = updatedCV.replace(rec.original, rec.suggested);
+      }
+    });
+    setOptimizedCV(updatedCV);
+    
+    toast({
+      title: newRecommendations[index].applied ? "Change Applied" : "Change Reverted",
+      description: `"${newRecommendations[index].original}" has been ${newRecommendations[index].applied ? 'updated' : 'reverted'}.`,
+    });
+  };
+
+  const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(optimizedCV);
       toast({
         title: "Copied to clipboard",
         description: "The optimized CV has been copied to your clipboard.",
@@ -110,7 +154,7 @@ ACHIEVEMENTS
     } catch (err) {
       toast({
         title: "Copy failed",
-        description: "Unable to copy to clipboard. Please select and copy manually.",
+        description: "Unable to copy to clipboard.",
         variant: "destructive",
       });
     }
@@ -124,11 +168,199 @@ ACHIEVEMENTS
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
-    
-    toast({
-      title: "CV Downloaded",
-      description: "Your optimized CV has been downloaded successfully.",
-    });
+  };
+
+  const getStepProgress = () => {
+    switch (currentStep) {
+      case "upload": return 25;
+      case "job-url": return 50;
+      case "analysis": return 75;
+      case "results": return 100;
+      default: return 0;
+    }
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case "upload":
+        return (
+          <div className="max-w-2xl mx-auto">
+            <Card className="p-8 shadow-soft">
+              <div className="text-center mb-6">
+                <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Upload Your CV</h2>
+                <p className="text-muted-foreground">
+                  Start by uploading your current CV. We support PDF, DOC, and TXT files.
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <Input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={handleFileUpload}
+                  className="cursor-pointer"
+                />
+                
+                {cvFile && (
+                  <div className="flex items-center gap-2 p-3 bg-success/10 rounded-md border border-success/20">
+                    <CheckCircle className="h-4 w-4 text-success" />
+                    <span className="text-sm font-medium">{cvFile.name}</span>
+                    <Badge variant="secondary">Uploaded</Badge>
+                  </div>
+                )}
+                
+                <Button 
+                  onClick={proceedToJobUrl}
+                  disabled={!cvFile}
+                  className="w-full"
+                  size="lg"
+                >
+                  Continue to Job URL
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          </div>
+        );
+
+      case "job-url":
+        return (
+          <div className="max-w-2xl mx-auto">
+            <Card className="p-8 shadow-soft">
+              <div className="text-center mb-6">
+                <Link className="h-16 w-16 text-primary mx-auto mb-4" />
+                <h2 className="text-2xl font-bold mb-2">Job Advertisement URL</h2>
+                <p className="text-muted-foreground">
+                  Provide the URL of the job you're applying for so we can tailor your CV accordingly.
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <Input
+                  type="url"
+                  placeholder="https://example.com/job-posting"
+                  value={jobUrl}
+                  onChange={(e) => setJobUrl(e.target.value)}
+                  className="text-center"
+                />
+                
+                <Button 
+                  onClick={startAnalysis}
+                  disabled={!jobUrl.trim()}
+                  className="w-full"
+                  size="lg"
+                >
+                  Start AI Analysis
+                  <Zap className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          </div>
+        );
+
+      case "analysis":
+        return (
+          <div className="max-w-2xl mx-auto text-center">
+            <Card className="p-8 shadow-soft">
+              <Zap className="h-16 w-16 text-primary mx-auto mb-4 animate-pulse" />
+              <h2 className="text-2xl font-bold mb-4">Analyzing Your CV</h2>
+              <p className="text-muted-foreground mb-6">
+                Our AI is analyzing your CV against the job requirements and generating personalized recommendations.
+              </p>
+              <div className="w-full bg-secondary rounded-full h-2 mb-4">
+                <div className="bg-primary h-2 rounded-full animate-pulse" style={{ width: "60%" }}></div>
+              </div>
+              <p className="text-sm text-muted-foreground">This usually takes 2-3 seconds...</p>
+            </Card>
+          </div>
+        );
+
+      case "results":
+        return (
+          <div className="grid lg:grid-cols-2 gap-6 h-[calc(100vh-12rem)]">
+            {/* Recommendations Panel */}
+            <Card className="p-6 shadow-soft overflow-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">AI Recommendations</h2>
+                <Badge variant="secondary">
+                  {recommendations.filter(r => r.applied).length}/{recommendations.length} Applied
+                </Badge>
+              </div>
+              
+              <div className="space-y-4">
+                {recommendations.map((rec, index) => (
+                  <div key={index} className="border rounded-lg p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <Badge variant="outline" className="capitalize">
+                        {rec.type}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant={rec.applied ? "default" : "outline"}
+                        onClick={() => applyRecommendation(index)}
+                      >
+                        {rec.applied ? (
+                          <>
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Applied
+                          </>
+                        ) : (
+                          <>
+                            <Edit3 className="h-3 w-3 mr-1" />
+                            Apply
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Original:</p>
+                        <p className="text-sm bg-muted/50 p-2 rounded">{rec.original}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Suggested:</p>
+                        <p className="text-sm bg-primary/10 p-2 rounded border border-primary/20">{rec.suggested}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Reason:</p>
+                        <p className="text-xs text-muted-foreground">{rec.reason}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* CV Preview Panel */}
+            <Card className="p-6 shadow-soft overflow-auto">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">CV Preview</h2>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={copyToClipboard}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </Button>
+                  <Button size="sm" onClick={downloadCV}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="bg-card border rounded-lg p-6">
+                <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
+                  {optimizedCV}
+                </pre>
+              </div>
+            </Card>
+          </div>
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
@@ -140,152 +372,21 @@ ACHIEVEMENTS
             CV Optimizer
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Transform your CV to perfectly match any job opportunity with AI-powered optimization
+            Follow our step-by-step process to optimize your CV for any job opportunity
           </p>
         </div>
 
-        {/* Input Section */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-8">
-          <Card className="p-6 shadow-soft">
-            <div className="flex items-center gap-2 mb-4">
-              <FileText className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Your CV</h2>
-            </div>
-            <Textarea
-              placeholder="Paste your current CV content here..."
-              value={cvText}
-              onChange={(e) => setCvText(e.target.value)}
-              className="min-h-[300px] resize-none"
-            />
-            <p className="text-sm text-muted-foreground mt-2">
-              {cvText.length} characters
-            </p>
-          </Card>
-
-          <Card className="p-6 shadow-soft">
-            <div className="flex items-center gap-2 mb-4">
-              <Briefcase className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-semibold">Job Advertisement</h2>
-            </div>
-            <Textarea
-              placeholder="Paste the job advertisement or description here..."
-              value={jobAdText}
-              onChange={(e) => setJobAdText(e.target.value)}
-              className="min-h-[300px] resize-none"
-            />
-            <p className="text-sm text-muted-foreground mt-2">
-              {jobAdText.length} characters
-            </p>
-          </Card>
-        </div>
-
-        {/* Action Button */}
-        <div className="text-center mb-8">
-          <Button
-            onClick={analyzeAndOptimize}
-            disabled={isAnalyzing}
-            size="lg"
-            className="px-8 py-6 text-lg font-semibold"
-          >
-            {isAnalyzing ? (
-              <>
-                <Zap className="mr-2 h-5 w-5 animate-pulse" />
-                Optimizing CV...
-              </>
-            ) : (
-              <>
-                <Zap className="mr-2 h-5 w-5" />
-                Optimize My CV
-              </>
-            )}
-          </Button>
-        </div>
-
-        {/* Results Section */}
-        {analysis && (
-          <div className="space-y-6">
-            {/* Analysis Summary */}
-            <Card className="p-6 shadow-soft">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Optimization Analysis</h2>
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  Score: {analysis.score}%
-                </Badge>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-success" />
-                    Key Improvements Made
-                  </h3>
-                  <ul className="space-y-2">
-                    {analysis.improvements.map((improvement, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <ArrowRight className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                        {improvement}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-warning" />
-                    Keywords Added
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {analysis.keywords.map((keyword, index) => (
-                      <Badge key={index} variant="outline">
-                        {keyword}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Side-by-side Comparison */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              <Card className="p-6 shadow-soft">
-                <h2 className="text-xl font-semibold mb-4">Original CV</h2>
-                <div className="bg-muted/50 p-4 rounded-md">
-                  <pre className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {cvText || "Your original CV will appear here..."}
-                  </pre>
-                </div>
-              </Card>
-
-              <Card className="p-6 shadow-soft">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold">Optimized CV</h2>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(optimizedCV)}
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={downloadCV}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download
-                    </Button>
-                  </div>
-                </div>
-                <div className="bg-accent/30 p-4 rounded-md border-l-4 border-primary">
-                  <pre className="whitespace-pre-wrap text-sm">
-                    {optimizedCV}
-                  </pre>
-                </div>
-              </Card>
-            </div>
+        {/* Progress Bar */}
+        <div className="max-w-2xl mx-auto mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Progress</span>
+            <span className="text-sm text-muted-foreground">{getStepProgress()}%</span>
           </div>
-        )}
+          <Progress value={getStepProgress()} className="h-2" />
+        </div>
+
+        {/* Step Content */}
+        {renderStepContent()}
       </div>
     </div>
   );
