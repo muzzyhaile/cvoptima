@@ -39,19 +39,69 @@ const CVOptimizer = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [optimizedCV, setOptimizedCV] = useState("");
+  const [fileError, setFileError] = useState("");
   const { toast } = useToast();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setFileError("");
       setCvFile(file);
-      // Simulate reading file content
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target?.result as string;
-        setCvText(content || "John Doe\nSoftware Engineer\n\nEXPERIENCE\nSoftware Developer at TechCorp\n- Developed web applications\n- Worked with team members\n- Fixed bugs and issues\n\nSKILLS\n- JavaScript\n- HTML/CSS\n- Problem solving");
-      };
-      reader.readAsText(file);
+      
+      // Check file type and handle accordingly
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      
+      if (fileExtension === 'txt') {
+        // Read plain text files
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          setCvText(content);
+        };
+        reader.readAsText(file);
+      } else if (fileExtension === 'pdf' || fileExtension === 'doc' || fileExtension === 'docx') {
+        // For demo purposes, simulate extracted content for PDF/Word files
+        // In a real implementation, you'd use libraries like pdf-parse or mammoth.js
+        const mockExtractedContent = `John Doe
+Senior Software Engineer
+
+PROFESSIONAL SUMMARY
+Experienced software engineer with 5+ years in web development. Skilled in JavaScript, React, and Node.js. Strong background in agile development methodologies and team collaboration.
+
+WORK EXPERIENCE
+
+Software Engineer | TechCorp Inc. | 2020 - Present
+• Developed and maintained web applications using React and Node.js
+• Collaborated with cross-functional teams to deliver high-quality software
+• Participated in code reviews and maintained coding standards
+• Worked on bug fixes and feature enhancements
+
+Junior Developer | StartupXYZ | 2019 - 2020
+• Built responsive websites using HTML, CSS, and JavaScript
+• Assisted senior developers with various projects
+• Learned best practices in software development
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of Technology | 2019
+
+SKILLS
+• Programming: JavaScript, HTML, CSS, React, Node.js
+• Tools: Git, VS Code, Chrome DevTools
+• Databases: MySQL, MongoDB
+• Other: Agile, Scrum, Problem Solving`;
+
+        setCvText(mockExtractedContent);
+        
+        toast({
+          title: "File Processed",
+          description: `Content extracted from ${file.name}. Note: This is a demo - real implementation would use proper document parsers.`,
+        });
+      } else {
+        setFileError("Unsupported file format. Please upload a TXT, PDF, DOC, or DOCX file.");
+        setCvFile(null);
+        return;
+      }
       
       toast({
         title: "CV Uploaded Successfully",
@@ -195,24 +245,36 @@ const CVOptimizer = () => {
               </div>
               
               <div className="space-y-4">
-                <Input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  onChange={handleFileUpload}
-                  className="cursor-pointer"
-                />
+                <div>
+                  <Input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={handleFileUpload}
+                    className="cursor-pointer"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Supported formats: PDF, DOC, DOCX, TXT
+                  </p>
+                </div>
                 
-                {cvFile && (
+                {fileError && (
+                  <div className="flex items-center gap-2 p-3 bg-destructive/10 rounded-md border border-destructive/20">
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <span className="text-sm text-destructive">{fileError}</span>
+                  </div>
+                )}
+                
+                {cvFile && !fileError && (
                   <div className="flex items-center gap-2 p-3 bg-success/10 rounded-md border border-success/20">
                     <CheckCircle className="h-4 w-4 text-success" />
                     <span className="text-sm font-medium">{cvFile.name}</span>
-                    <Badge variant="secondary">Uploaded</Badge>
+                    <Badge variant="secondary">Processed</Badge>
                   </div>
                 )}
                 
                 <Button 
                   onClick={proceedToJobUrl}
-                  disabled={!cvFile}
+                  disabled={!cvFile || !!fileError}
                   className="w-full"
                   size="lg"
                 >
@@ -244,6 +306,9 @@ const CVOptimizer = () => {
                   onChange={(e) => setJobUrl(e.target.value)}
                   className="text-center"
                 />
+                <p className="text-xs text-muted-foreground text-center">
+                  Paste the full URL of the job advertisement you're applying for
+                </p>
                 
                 <Button 
                   onClick={startAnalysis}
