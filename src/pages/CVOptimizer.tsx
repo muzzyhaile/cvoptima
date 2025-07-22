@@ -11,6 +11,8 @@ import * as pdfjsLib from "pdfjs-dist";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
 import { 
   FileText, 
   Upload, 
@@ -316,71 +318,57 @@ const CVOptimizer = () => {
 
   const createOptimizedWordDocument = async () => {
     try {
-      // Convert optimized text back to mammoth format and create new document
-      const optimizedHtml = optimizedCVHtml;
+      if (!originalWordBuffer) {
+        throw new Error("Original Word document buffer not available");
+      }
+
+      // Load the original document as a zip file
+      const zip = new PizZip(originalWordBuffer);
       
-      // For now, we'll use mammoth to convert our HTML back to a Word document
-      // This preserves more formatting than creating from scratch
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.15; }
-            h1 { font-size: 16pt; font-weight: bold; margin: 0 0 12pt 0; }
-            h2 { font-size: 14pt; font-weight: bold; margin: 12pt 0 6pt 0; }
-            h3 { font-size: 12pt; font-weight: bold; margin: 6pt 0 3pt 0; }
-            p { margin: 0 0 6pt 0; }
-            strong { font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          ${optimizedHtml}
-        </body>
-        </html>
-      `;
-
-      // Create a simple Word document with the optimized content
-      // This maintains better formatting than plain text conversion
-      const paragraphs = optimizedCV.split('\n').filter(line => line.trim()).map(line => {
-        const trimmed = line.trim();
-        const isHeading = trimmed.length < 60 && (
-          trimmed === trimmed.toUpperCase() ||
-          trimmed.endsWith(':') ||
-          /^[A-Z][A-Z\s&]+$/.test(trimmed)
-        );
-        
-        return new Paragraph({
-          children: [new TextRun({
-            text: trimmed,
-            bold: isHeading,
-            size: isHeading ? 24 : 22
-          })],
-          spacing: { 
-            after: isHeading ? 200 : 100,
-            before: isHeading ? 200 : 0
-          }
-        });
+      // Create a docxtemplater instance with the original document
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
       });
 
-      const doc = new Document({
-        sections: [{
-          properties: {
-            page: {
-              margin: {
-                top: 720,    // 0.5 inch
-                right: 720,  // 0.5 inch
-                bottom: 720, // 0.5 inch
-                left: 720,   // 0.5 inch
-              }
-            }
-          },
-          children: paragraphs
-        }]
+      // Read the document.xml content to apply text replacements
+      let documentXml = zip.files["word/document.xml"].asText();
+      
+      // Apply all approved recommendations to the document XML while preserving formatting
+      recommendations.forEach(rec => {
+        if (rec.applied) {
+          // Escape special XML characters in the original text
+          const escapedOriginal = rec.original
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+          
+          const escapedSuggested = rec.suggested
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+
+          // Replace the text in the XML while preserving formatting
+          const regex = new RegExp(escapedOriginal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+          documentXml = documentXml.replace(regex, escapedSuggested);
+        }
       });
 
-      const buffer = await Packer.toBuffer(doc);
-      const blob = new Blob([buffer], { 
+      // Update the document.xml in the zip
+      zip.file("word/document.xml", documentXml);
+
+      // Generate the updated document
+      const buf = zip.generate({ 
+        type: "uint8array",
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      });
+      
+      // Convert to blob for download
+      const blob = new Blob([buf], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       });
       
@@ -393,12 +381,72 @@ const CVOptimizer = () => {
       
       toast({
         title: "CV downloaded as Word",
-        description: "Your optimized CV has been downloaded with preserved formatting.",
+        description: "Your optimized CV has been downloaded with exact formatting preserved.",
       });
       
     } catch (error) {
       console.error('Error in createOptimizedWordDocument:', error);
-      throw error;
+      
+      // Fallback to creating a new document if direct XML manipulation fails
+      try {
+        const paragraphs = optimizedCV.split('\n').filter(line => line.trim()).map(line => {
+          const trimmed = line.trim();
+          const isHeading = trimmed.length < 60 && (
+            trimmed === trimmed.toUpperCase() ||
+            trimmed.endsWith(':') ||
+            /^[A-Z][A-Z\s&]+$/.test(trimmed)
+          );
+          
+          return new Paragraph({
+            children: [new TextRun({
+              text: trimmed,
+              bold: isHeading,
+              size: isHeading ? 24 : 22
+            })],
+            spacing: { 
+              after: isHeading ? 200 : 100,
+              before: isHeading ? 100 : 0
+            }
+          });
+        });
+
+        const newDoc = new Document({
+          sections: [{
+            properties: {
+              page: {
+                margin: {
+                  top: 720,
+                  right: 720,
+                  bottom: 720,
+                  left: 720,
+                }
+              }
+            },
+            children: paragraphs
+          }]
+        });
+
+        const buffer = await Packer.toBuffer(newDoc);
+        const blob = new Blob([buffer], { 
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+        });
+        
+        const element = document.createElement('a');
+        element.href = URL.createObjectURL(blob);
+        element.download = `${originalFileName || 'optimized-cv'}.docx`;
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+        
+        toast({
+          title: "CV downloaded as Word",
+          description: "Your optimized CV has been downloaded (fallback formatting).",
+        });
+        
+      } catch (fallbackError) {
+        console.error('Fallback creation also failed:', fallbackError);
+        throw new Error("Failed to create Word document with both methods");
+      }
     }
   };
 
