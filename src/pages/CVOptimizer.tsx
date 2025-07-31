@@ -60,7 +60,8 @@ const CVOptimizer = () => {
   useEffect(() => {
     if (originalWordBuffer && docxViewerRef.current && viewMode === "original") {
       console.log('useEffect: Rendering DOCX preview...');
-      renderDocxPreview(originalWordBuffer);
+      // Add small delay to ensure DOM is ready
+      setTimeout(() => renderDocxPreview(originalWordBuffer), 100);
     }
   }, [originalWordBuffer, viewMode]);
   const { toast } = useToast();
@@ -150,17 +151,7 @@ const CVOptimizer = () => {
           bufferSize: originalWordBuffer?.byteLength
         });
         
-        if (fileExtension === 'docx' && originalWordBuffer) {
-          console.log('Attempting to render DOCX preview...');
-          // Use useEffect to ensure the ref is ready
-          setTimeout(() => {
-            if (docxViewerRef.current) {
-              renderDocxPreview(originalWordBuffer);
-            } else {
-              console.error('docxViewerRef.current is still null after timeout');
-            }
-          }, 1000);
-        }
+        // Word document rendering is now handled by useEffect
         
         console.log('File processed successfully:', {
           fileType: fileExtension,
