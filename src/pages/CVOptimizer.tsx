@@ -169,19 +169,46 @@ const CVOptimizer = () => {
   const renderDocxPreview = async (arrayBuffer: ArrayBuffer) => {
     try {
       if (docxViewerRef.current) {
+        console.log('Starting DOCX preview render...');
         docxViewerRef.current.innerHTML = '<div class="text-center py-4">Loading Word document...</div>';
+        
+        // Use minimal options to avoid rendering issues
         await renderAsync(arrayBuffer, docxViewerRef.current, undefined, {
-          className: "docx-viewer",
-          inWrapper: false,
+          className: "docx-preview-content",
+          inWrapper: true,
           ignoreWidth: false,
           ignoreHeight: false,
-          renderHeaders: true,
-          renderFooters: true,
-          renderFootnotes: true,
-          renderEndnotes: true,
-          useBase64URL: false
+          ignoreFonts: false,
+          breakPages: false,
+          ignoreLastRenderedPageBreak: false,
+          experimental: false,
+          trimXmlDeclaration: true,
+          useBase64URL: false,
+          debug: false
         });
+        
         console.log('DOCX preview rendered successfully');
+        
+        // Add some basic styling to the rendered content
+        const styleElement = document.createElement('style');
+        styleElement.textContent = `
+          .docx-preview-content {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 100%;
+            overflow-wrap: break-word;
+          }
+          .docx-preview-content p {
+            margin-bottom: 8px;
+          }
+          .docx-preview-content h1, .docx-preview-content h2, .docx-preview-content h3 {
+            font-weight: bold;
+            margin-top: 16px;
+            margin-bottom: 8px;
+          }
+        `;
+        document.head.appendChild(styleElement);
       }
     } catch (error) {
       console.error('Error rendering DOCX preview:', error);
@@ -191,6 +218,7 @@ const CVOptimizer = () => {
             <div class="text-muted-foreground">
               <p>Could not render Word document preview</p>
               <p class="text-sm mt-2">Document content is still available for optimization</p>
+              <pre class="text-xs mt-4 p-2 bg-gray-100 rounded text-left overflow-auto max-h-32">${error.message}</pre>
             </div>
           </div>
         `;
