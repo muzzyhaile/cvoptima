@@ -55,6 +55,14 @@ const CVOptimizer = () => {
   const [viewMode, setViewMode] = useState<"original" | "optimized">("original");
   const cvPreviewRef = useRef<HTMLDivElement>(null);
   const docxViewerRef = useRef<HTMLDivElement>(null);
+
+  // UseEffect to render Word document when buffer and ref are ready
+  useEffect(() => {
+    if (originalWordBuffer && docxViewerRef.current && viewMode === "original") {
+      console.log('useEffect: Rendering DOCX preview...');
+      renderDocxPreview(originalWordBuffer);
+    }
+  }, [originalWordBuffer, viewMode]);
   const { toast } = useToast();
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -142,9 +150,16 @@ const CVOptimizer = () => {
           bufferSize: originalWordBuffer?.byteLength
         });
         
-        if (fileExtension === 'docx' && docxViewerRef.current && originalWordBuffer) {
+        if (fileExtension === 'docx' && originalWordBuffer) {
           console.log('Attempting to render DOCX preview...');
-          setTimeout(() => renderDocxPreview(originalWordBuffer), 500);
+          // Use useEffect to ensure the ref is ready
+          setTimeout(() => {
+            if (docxViewerRef.current) {
+              renderDocxPreview(originalWordBuffer);
+            } else {
+              console.error('docxViewerRef.current is still null after timeout');
+            }
+          }, 1000);
         }
         
         console.log('File processed successfully:', {
