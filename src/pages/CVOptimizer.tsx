@@ -135,8 +135,16 @@ const CVOptimizer = () => {
         setCvHtml(extractedHtml);
         
         // Render original document if it's a Word file
+        console.log('File processing complete:', {
+          fileExtension,
+          hasDocxViewerRef: !!docxViewerRef.current,
+          hasOriginalWordBuffer: !!originalWordBuffer,
+          bufferSize: originalWordBuffer?.byteLength
+        });
+        
         if (fileExtension === 'docx' && docxViewerRef.current && originalWordBuffer) {
-          setTimeout(() => renderDocxPreview(originalWordBuffer), 100);
+          console.log('Attempting to render DOCX preview...');
+          setTimeout(() => renderDocxPreview(originalWordBuffer), 500);
         }
         
         console.log('File processed successfully:', {
@@ -167,58 +175,48 @@ const CVOptimizer = () => {
   };
 
   const renderDocxPreview = async (arrayBuffer: ArrayBuffer) => {
+    console.log('renderDocxPreview called with buffer size:', arrayBuffer.byteLength);
+    
     try {
-      if (docxViewerRef.current) {
-        console.log('Starting DOCX preview render...');
-        docxViewerRef.current.innerHTML = '<div class="text-center py-4">Loading Word document...</div>';
-        
-        // Use minimal options to avoid rendering issues
-        await renderAsync(arrayBuffer, docxViewerRef.current, undefined, {
-          className: "docx-preview-content",
-          inWrapper: true,
-          ignoreWidth: false,
-          ignoreHeight: false,
-          ignoreFonts: false,
-          breakPages: false,
-          ignoreLastRenderedPageBreak: false,
-          experimental: false,
-          trimXmlDeclaration: true,
-          useBase64URL: false,
-          debug: false
-        });
-        
-        console.log('DOCX preview rendered successfully');
-        
-        // Add some basic styling to the rendered content
-        const styleElement = document.createElement('style');
-        styleElement.textContent = `
-          .docx-preview-content {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 100%;
-            overflow-wrap: break-word;
-          }
-          .docx-preview-content p {
-            margin-bottom: 8px;
-          }
-          .docx-preview-content h1, .docx-preview-content h2, .docx-preview-content h3 {
-            font-weight: bold;
-            margin-top: 16px;
-            margin-bottom: 8px;
-          }
-        `;
-        document.head.appendChild(styleElement);
+      if (!docxViewerRef.current) {
+        console.error('docxViewerRef.current is null');
+        return;
       }
+
+      console.log('docxViewerRef.current exists, starting render...');
+      docxViewerRef.current.innerHTML = '<div class="text-center py-4 text-blue-600">Loading Word document...</div>';
+      
+      // Try the simplest possible rendering first
+      console.log('Calling renderAsync...');
+      await renderAsync(arrayBuffer, docxViewerRef.current);
+      
+      console.log('DOCX preview rendered successfully!');
+      
+      // Verify content was actually rendered
+      if (docxViewerRef.current.children.length === 0) {
+        console.warn('No content rendered in docx viewer');
+        throw new Error('No content was rendered');
+      }
+      
     } catch (error) {
-      console.error('Error rendering DOCX preview:', error);
+      console.error('DOCX rendering failed:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      
       if (docxViewerRef.current) {
         docxViewerRef.current.innerHTML = `
-          <div class="text-center py-8">
-            <div class="text-muted-foreground">
-              <p>Could not render Word document preview</p>
-              <p class="text-sm mt-2">Document content is still available for optimization</p>
-              <pre class="text-xs mt-4 p-2 bg-gray-100 rounded text-left overflow-auto max-h-32">${error.message}</pre>
+          <div class="p-4 bg-red-50 border border-red-200 rounded">
+            <div class="text-red-800">
+              <h3 class="font-semibold">Word Document Preview Failed</h3>
+              <p class="text-sm mt-1">Error: ${error.message}</p>
+              <details class="mt-2">
+                <summary class="cursor-pointer text-xs">Technical Details</summary>
+                <pre class="text-xs mt-2 p-2 bg-white rounded overflow-auto max-h-32">${error.stack}</pre>
+              </details>
+              <p class="text-sm mt-2 text-red-600">The document text has been extracted and is available for optimization.</p>
             </div>
           </div>
         `;
@@ -810,11 +808,31 @@ const CVOptimizer = () => {
                 {viewMode === "original" ? (
                   <>
                     {originalWordBuffer ? (
-                      <div 
-                        ref={docxViewerRef}
-                        className="docx-preview"
-                        style={{ minHeight: '400px' }}
-                      />
+                      <div style={{ minHeight: '400px' }}>
+                        <div 
+                          ref={docxViewerRef}
+                          className="docx-preview"
+                          style={{ minHeight: '400px', border: '1px solid #e5e5e5' }}
+                        />
+                        {/* Fallback text preview */}
+                        <div className="mt-4 p-4 bg-gray-50 rounded">
+                          <p className="text-sm text-gray-600 mb-2">Debug Info:</p>
+                          <div className="text-xs text-gray-500">
+                            <div>Buffer Size: {originalWordBuffer.byteLength} bytes</div>
+                            <div>File Name: {originalFileName}</div>
+                            <div>Text Length: {cvText.length} characters</div>
+                          </div>
+                          <details className="mt-2">
+                            <summary className="text-sm cursor-pointer">Show extracted text (fallback)</summary>
+                            <div 
+                              className="mt-2 p-2 bg-white rounded text-sm max-h-48 overflow-y-auto"
+                              style={{ whiteSpace: 'pre-wrap' }}
+                            >
+                              {cvText}
+                            </div>
+                          </details>
+                        </div>
+                      </div>
                     ) : cvFile?.name.endsWith('.pdf') ? (
                       <div className="text-center py-8">
                         <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
