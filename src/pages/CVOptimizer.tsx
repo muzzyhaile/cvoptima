@@ -115,8 +115,8 @@ const CVOptimizer = () => {
           reader.readAsText(file);
           return;
         } else if (fileExtension === 'pdf') {
-          // Set PDF.js worker
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+          // Fix PDF.js worker version mismatch
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js`;
           extractedText = await extractTextFromPDF(file);
           extractedHtml = `<div class="cv-content">${extractedText.split('\n').map(line => `<p>${line || '&nbsp;'}</p>`).join('')}</div>`;
         } else if (fileExtension === 'docx' || fileExtension === 'doc') {
@@ -136,8 +136,14 @@ const CVOptimizer = () => {
         
         // Render original document if it's a Word file
         if (fileExtension === 'docx' && docxViewerRef.current && originalWordBuffer) {
-          renderDocxPreview(originalWordBuffer);
+          setTimeout(() => renderDocxPreview(originalWordBuffer), 100);
         }
+        
+        console.log('File processed successfully:', {
+          fileType: fileExtension,
+          textLength: extractedText.length,
+          hasWordBuffer: !!originalWordBuffer
+        });
         
         toast({
           title: "CV Uploaded Successfully",
@@ -163,7 +169,7 @@ const CVOptimizer = () => {
   const renderDocxPreview = async (arrayBuffer: ArrayBuffer) => {
     try {
       if (docxViewerRef.current) {
-        docxViewerRef.current.innerHTML = '';
+        docxViewerRef.current.innerHTML = '<div class="text-center py-4">Loading Word document...</div>';
         await renderAsync(arrayBuffer, docxViewerRef.current, undefined, {
           className: "docx-viewer",
           inWrapper: false,
@@ -175,9 +181,20 @@ const CVOptimizer = () => {
           renderEndnotes: true,
           useBase64URL: false
         });
+        console.log('DOCX preview rendered successfully');
       }
     } catch (error) {
       console.error('Error rendering DOCX preview:', error);
+      if (docxViewerRef.current) {
+        docxViewerRef.current.innerHTML = `
+          <div class="text-center py-8">
+            <div class="text-muted-foreground">
+              <p>Could not render Word document preview</p>
+              <p class="text-sm mt-2">Document content is still available for optimization</p>
+            </div>
+          </div>
+        `;
+      }
     }
   };
 
