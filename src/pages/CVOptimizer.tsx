@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import Docxtemplater from 'docxtemplater';
 import PizZip from 'pizzip';
+import { renderAsync } from 'docx-preview';
 import { 
   FileText, 
   Upload, 
@@ -51,7 +52,9 @@ const CVOptimizer = () => {
   const [optimizedCV, setOptimizedCV] = useState("");
   const [optimizedCVHtml, setOptimizedCVHtml] = useState("");
   const [fileError, setFileError] = useState("");
+  const [viewMode, setViewMode] = useState<"original" | "optimized">("original");
   const cvPreviewRef = useRef<HTMLDivElement>(null);
+  const docxViewerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -117,8 +120,8 @@ const CVOptimizer = () => {
           extractedText = await extractTextFromPDF(file);
           extractedHtml = `<div class="cv-content">${extractedText.split('\n').map(line => `<p>${line || '&nbsp;'}</p>`).join('')}</div>`;
         } else if (fileExtension === 'docx' || fileExtension === 'doc') {
-          const arrayBuffer = await file.arrayBuffer();
-          setOriginalWordBuffer(arrayBuffer);
+          const fileArrayBuffer = await file.arrayBuffer();
+          setOriginalWordBuffer(fileArrayBuffer);
           const wordContent = await extractFromWord(file);
           extractedText = wordContent.text;
           extractedHtml = wordContent.html;
@@ -130,6 +133,11 @@ const CVOptimizer = () => {
         
         setCvText(extractedText);
         setCvHtml(extractedHtml);
+        
+        // Render original document if it's a Word file
+        if (fileExtension === 'docx' && docxViewerRef.current && originalWordBuffer) {
+          renderDocxPreview(originalWordBuffer);
+        }
         
         toast({
           title: "CV Uploaded Successfully",
@@ -149,6 +157,27 @@ const CVOptimizer = () => {
           variant: "destructive",
         });
       }
+    }
+  };
+
+  const renderDocxPreview = async (arrayBuffer: ArrayBuffer) => {
+    try {
+      if (docxViewerRef.current) {
+        docxViewerRef.current.innerHTML = '';
+        await renderAsync(arrayBuffer, docxViewerRef.current, undefined, {
+          className: "docx-viewer",
+          inWrapper: false,
+          ignoreWidth: false,
+          ignoreHeight: false,
+          renderHeaders: true,
+          renderFooters: true,
+          renderFootnotes: true,
+          renderEndnotes: true,
+          useBase64URL: false
+        });
+      }
+    } catch (error) {
+      console.error('Error rendering DOCX preview:', error);
     }
   };
 
@@ -693,6 +722,26 @@ const CVOptimizer = () => {
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">CV Preview</h2>
                 <div className="flex gap-2 flex-wrap">
+                  <div className="flex rounded-md border border-input bg-background">
+                    <Button
+                      variant={viewMode === "original" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("original")}
+                      className="rounded-r-none border-r"
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      Original
+                    </Button>
+                    <Button
+                      variant={viewMode === "optimized" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setViewMode("optimized")}
+                      className="rounded-l-none"
+                    >
+                      <Edit3 className="h-4 w-4 mr-1" />
+                      Optimized
+                    </Button>
+                  </div>
                   <Button variant="outline" size="sm" onClick={copyToClipboard}>
                     <Copy className="h-4 w-4 mr-1" />
                     Copy
@@ -713,27 +762,59 @@ const CVOptimizer = () => {
               </div>
               
               <div className="bg-white border rounded-lg p-6 min-h-[400px]">
-                <div 
-                  ref={cvPreviewRef}
-                  className="cv-preview-content"
-                  style={{
-                    fontFamily: 'Arial, sans-serif',
-                    lineHeight: '1.6',
-                    color: '#333',
-                    backgroundColor: '#ffffff'
-                  }}
-                >
-                  {optimizedCVHtml ? (
-                    <div 
-                      dangerouslySetInnerHTML={{ __html: optimizedCVHtml }}
-                      className="prose prose-sm max-w-none [&>p]:mb-2 [&>h1]:text-xl [&>h1]:font-bold [&>h1]:mb-3 [&>h2]:text-lg [&>h2]:font-semibold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-medium [&>h3]:mb-1"
-                    />
-                  ) : (
-                    <div className="text-gray-500 text-center py-8">
-                      Your CV content will appear here after processing...
-                    </div>
-                  )}
-                </div>
+                {viewMode === "original" ? (
+                  <>
+                    {originalWordBuffer ? (
+                      <div 
+                        ref={docxViewerRef}
+                        className="docx-preview"
+                        style={{ minHeight: '400px' }}
+                      />
+                    ) : cvFile?.name.endsWith('.pdf') ? (
+                      <div className="text-center py-8">
+                        <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">PDF Preview</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Original PDF format preserved for download
+                        </p>
+                      </div>
+                    ) : (
+                      <div 
+                        className="original-text-preview"
+                        style={{
+                          fontFamily: 'Arial, sans-serif',
+                          lineHeight: '1.6',
+                          color: '#333',
+                          whiteSpace: 'pre-wrap'
+                        }}
+                      >
+                        {cvText || "No original document to display"}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div 
+                    ref={cvPreviewRef}
+                    className="cv-preview-content"
+                    style={{
+                      fontFamily: 'Arial, sans-serif',
+                      lineHeight: '1.6',
+                      color: '#333',
+                      backgroundColor: '#ffffff'
+                    }}
+                  >
+                    {optimizedCVHtml ? (
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: optimizedCVHtml }}
+                        className="prose prose-sm max-w-none [&>p]:mb-2 [&>h1]:text-xl [&>h1]:font-bold [&>h1]:mb-3 [&>h2]:text-lg [&>h2]:font-semibold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-medium [&>h3]:mb-1"
+                      />
+                    ) : (
+                      <div className="text-gray-500 text-center py-8">
+                        Your optimized CV content will appear here after applying recommendations...
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
           </div>
