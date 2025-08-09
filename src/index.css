@@ -1,108 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* BRUTALIST DESIGN SYSTEM - Raw, Bold, Industrial */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 215 25% 27%;
+    /* Core Brutalist Color Palette - Improved Contrast */
+    --background: 0 0% 5%;          /* Deep black background */
+    --foreground: 0 0% 98%;         /* Pure white text */
 
-    --card: 0 0% 100%;
-    --card-foreground: 215 25% 27%;
+    --card: 0 0% 10%;               /* Dark cards with better contrast */
+    --card-foreground: 0 0% 98%;    /* White text on cards */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 25% 27%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
 
-    --primary: 210 100% 56%;
-    --primary-foreground: 0 0% 100%;
+    /* Brutalist Primary - High Contrast Yellow */
+    --primary: 60 100% 65%;         /* Even brighter yellow for buttons */
+    --primary-foreground: 0 0% 0%;  /* Pure black text on yellow */
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 215 25% 27%;
+    /* Secondary - Pure White */
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 0%;
 
-    --muted: 215 20% 96%;
-    --muted-foreground: 215 15% 46%;
+    /* Button specific colors for better contrast */
+    --button-primary: 60 100% 70%;     /* Bright yellow for buttons */
+    --button-primary-text: 0 0% 0%;    /* Black text on yellow buttons */
+    --button-secondary: 0 0% 90%;      /* Light grey for secondary buttons */
+    --button-secondary-text: 0 0% 0%;  /* Black text on secondary buttons */
+    --button-outline: 0 0% 98%;        /* White outline buttons */
+    --button-outline-text: 0 0% 98%;   /* White text on outline buttons */
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 215 25% 27%;
+    /* Muted - Better contrast greys */
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 85%;   /* Much lighter for readability */
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    /* Accent - Sharp Red with better contrast */
+    --accent: 0 90% 60%;            /* Lighter red for visibility */
+    --accent-foreground: 0 0% 98%;  /* White text on red */
 
-    --border: 215 20% 89%;
-    --input: 215 20% 89%;
-    --ring: 210 100% 56%;
+    /* Error/Warning - High contrast colors */
+    --destructive: 0 100% 60%;      /* Lighter red for readability */
+    --destructive-foreground: 0 0% 98%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
+    /* Border - High contrast white */
+    --border: 0 0% 98%;             /* Pure white borders */
+    --input: 0 0% 12%;              /* Darker inputs with white text */
+    --ring: 60 100% 60%;            /* Brighter yellow focus ring */
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 100%;
+    /* Success/Warning - Better contrast */
+    --success: 120 60% 50%;         /* Brighter green */
+    --success-foreground: 0 0% 98%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(210 100% 56%), hsl(195 100% 61%));
-    --gradient-secondary: linear-gradient(135deg, hsl(215 20% 96%), hsl(210 40% 96%));
+    --warning: 30 100% 60%;         /* Brighter orange */
+    --warning-foreground: 0 0% 0%;  /* Black text on orange */
 
-    --shadow-elegant: 0 10px 40px -15px hsl(210 100% 56% / 0.2);
-    --shadow-soft: 0 4px 20px -8px hsl(215 25% 27% / 0.1);
+    /* Harsh shadows with better visibility */
+    --shadow-brutal: 6px 6px 0px hsl(0 0% 98%);
+    --shadow-inset: inset 3px 3px 0px hsl(0 0% 0%);
 
-    --radius: 0.5rem;
+    /* Sharp corners */
+    --radius: 0px;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 60 100% 60%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 98%;
+    --sidebar-ring: 60 100% 60%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Improved dark mode - Same high contrast values */
+    --background: 0 0% 5%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 60 100% 60%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 98%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 85%;
+    --accent: 0 90% 60%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 98%;
+    --input: 0 0% 12%;
+    --ring: 60 100% 60%;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 60 100% 60%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 98%;
+    --sidebar-ring: 60 100% 60%;
   }
 }
 
@@ -113,15 +114,293 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+  }
+
+  /* NUCLEAR OPTION: Force selection visibility with absolute highest priority */
+  * {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    -ms-user-select: text !important;
+    user-select: text !important;
+  }
+
+  *::selection,
+  *::-moz-selection {
+    background: #facc15 !important;
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    outline: none !important;
+    -webkit-text-fill-color: #000000 !important;
+    -webkit-text-stroke: none !important;
+  }
+
+  /* Override any possible framework conflicts */
+  html, body, div, span, h1, h2, h3, h4, h5, h6, p, a, strong, em {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    user-select: text !important;
+  }
+
+  html ::selection,
+  body ::selection,
+  div ::selection,
+  span ::selection,
+  h1 ::selection,
+  h2 ::selection,
+  h3 ::selection,
+  h4 ::selection,
+  h5 ::selection,
+  h6 ::selection,
+  p ::selection,
+  a ::selection {
+    background: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    -webkit-text-fill-color: #000000 !important;
+  }
+
+  html ::-moz-selection,
+  body ::-moz-selection,
+  div ::-moz-selection,
+  span ::-moz-selection,
+  h1 ::-moz-selection,
+  h2 ::-moz-selection,
+  h3 ::-moz-selection,
+  h4 ::-moz-selection,
+  h5 ::-moz-selection,
+  h6 ::-moz-selection,
+  p ::-moz-selection,
+  a ::-moz-selection {
+    background: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+  }
+
+  /* Brutalist Typography */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Remove all smooth transitions - Brutalism is immediate */
+  *, *::before, *::after {
+    transition: none !important;
   }
 }
 
 @layer utilities {
-  .shadow-elegant {
-    box-shadow: var(--shadow-elegant);
+  .shadow-brutal {
+    box-shadow: var(--shadow-brutal);
   }
-  
-  .shadow-soft {
-    box-shadow: var(--shadow-soft);
+
+  .shadow-inset {
+    box-shadow: var(--shadow-inset);
+  }
+
+  /* Brutalist text styles with high contrast */
+  .text-brutal {
+    font-family: 'Inter', sans-serif;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    color: hsl(var(--foreground));
+  }
+
+  .text-mono {
+    font-family: 'JetBrains Mono', monospace;
+    color: hsl(var(--foreground));
+  }
+
+  /* High contrast text utilities */
+  .text-high-contrast {
+    color: hsl(0 0% 98%) !important;
+    text-shadow: 1px 1px 0px hsl(0 0% 0%);
+  }
+
+  .text-on-primary {
+    color: hsl(0 0% 0%) !important;
+    font-weight: 700;
+  }
+
+  .text-on-dark {
+    color: hsl(0 0% 98%) !important;
+    font-weight: 500;
+  }
+
+  /* Button text visibility */
+  .btn-text-visible {
+    color: hsl(0 0% 0%) !important;
+    font-weight: 700 !important;
+  }
+
+  /* Brutalist grid system */
+  .grid-brutal {
+    display: grid;
+    gap: 4px;
+    border: 4px solid hsl(var(--border));
+  }
+
+  /* High contrast focus states */
+  .focus-brutal:focus {
+    outline: 4px solid hsl(var(--primary));
+    outline-offset: 4px;
+  }
+
+  /* Button specific styling */
+  .btn-primary-brutal {
+    background-color: #facc15 !important; /* Bright yellow */
+    color: #000000 !important;            /* Pure black text */
+    border: 4px solid #000000 !important; /* Black border */
+    font-weight: 900 !important;
+  }
+
+  .btn-outline-brutal {
+    background-color: transparent !important;
+    color: #ffffff !important;            /* White text */
+    border: 4px solid #ffffff !important; /* White border */
+    font-weight: 900 !important;
+  }
+
+  /* Ensure readability on all backgrounds */
+  .readable-on-card {
+    color: hsl(0 0% 98%) !important;
+  }
+
+  .readable-on-muted {
+    color: hsl(0 0% 98%) !important;
+  }
+
+  /* Force high contrast selection on feature cards */
+  .feature-card *::selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+  }
+
+  .feature-card *::-moz-selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+  }
+
+  /* Ensure muted text is also readable when selected - Maximum specificity */
+  .text-muted-foreground::selection,
+  [class*="text-muted"]::selection,
+  .font-mono::selection,
+  .text-sm::selection,
+  .uppercase::selection,
+  .tracking-wide::selection,
+  p.text-muted-foreground::selection,
+  p.font-mono::selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    outline: none !important;
+  }
+
+  .text-muted-foreground::-moz-selection,
+  [class*="text-muted"]::-moz-selection,
+  .font-mono::-moz-selection,
+  .text-sm::-moz-selection,
+  .uppercase::-moz-selection,
+  .tracking-wide::-moz-selection,
+  p.text-muted-foreground::-moz-selection,
+  p.font-mono::-moz-selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Override any Tailwind CSS selection styles */
+  .text-muted-foreground.font-mono.text-sm.uppercase.tracking-wide::selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    outline: none !important;
+  }
+
+  .text-muted-foreground.font-mono.text-sm.uppercase.tracking-wide::-moz-selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* Force selection styles on the specific feature card text - Nuclear option */
+  .feature-card p::selection,
+  .feature-card .text-muted-foreground::selection,
+  [data-lov-name="p"]::selection,
+  [class*="text-muted-foreground"]::selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    outline: none !important;
+    -webkit-text-fill-color: #000000 !important;
+  }
+
+  .feature-card p::-moz-selection,
+  .feature-card .text-muted-foreground::-moz-selection,
+  [data-lov-name="p"]::-moz-selection,
+  [class*="text-muted-foreground"]::-moz-selection {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+    text-shadow: none !important;
+    outline: none !important;
+  }
+
+  /* CV Preview Optimization Styles */
+  .docx-preview {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+  }
+
+  .docx-preview > * {
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Ensure Word document content uses full width */
+  .docx-preview .docx-wrapper,
+  .docx-preview .docx-document,
+  .docx-preview .docx-section,
+  .docx-preview .docx-page {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* CV Text content optimization */
+  .cv-preview-content,
+  .original-text-preview {
+    width: 100% !important;
+    max-width: 100% !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Responsive grid adjustments for CV comparison */
+  @media (max-width: 1024px) {
+    .cv-comparison-grid {
+      grid-template-columns: 1fr !important;
+    }
+    
+    .cv-comparison-grid .recommendations-panel {
+      order: 2;
+    }
+    
+    .cv-comparison-grid .cv-preview-panel {
+      order: 1;
+    }
   }
 }

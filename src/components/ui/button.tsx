@@ -5,19 +5,19 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-bold ring-offset-background focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-4 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 uppercase tracking-wide shadow-brutal border-4 border-white",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-yellow-400 text-black font-black hover:bg-yellow-300 hover:shadow-brutal-hover hover:translate-x-[-4px] hover:translate-y-[-4px] border-black",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-red-600 text-white font-black border-white hover:bg-red-500 hover:shadow-brutal-hover hover:translate-x-[-4px] hover:translate-y-[-4px]",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border-4 border-white bg-transparent text-white hover:bg-yellow-400 hover:text-black font-black hover:shadow-brutal-hover hover:translate-x-[-4px] hover:translate-y-[-4px]",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-gray-200 text-black font-black border-black hover:bg-gray-100 hover:shadow-brutal-hover hover:translate-x-[-4px] hover:translate-y-[-4px]",
+        ghost: "border-transparent text-white hover:bg-red-600 hover:text-white font-black hover:border-white",
+        link: "text-yellow-400 underline-offset-4 hover:underline font-black border-transparent hover:text-yellow-300",
       },
       size: {
         default: "h-10 px-4 py-2",
