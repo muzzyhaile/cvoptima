@@ -393,6 +393,7 @@
   @media (max-width: 1024px) {
     .cv-comparison-grid {
       grid-template-columns: 1fr !important;
+      gap: 1rem !important;
     }
     
     .cv-comparison-grid .recommendations-panel {
@@ -402,5 +403,39 @@
     .cv-comparison-grid .cv-preview-panel {
       order: 1;
     }
+  }
+
+  /* Optimize for ultra-wide screens */
+  @media (min-width: 1920px) {
+    .cv-comparison-grid {
+      gap: 2rem !important;
+    }
+    
+    .cv-preview-panel .bg-white {
+      padding: 2rem !important;
+    }
+  }
+
+  /* Enhanced scrollbar styling for CV preview */
+  .cv-preview-panel::-webkit-scrollbar,
+  .docx-preview::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .cv-preview-panel::-webkit-scrollbar-track,
+  .docx-preview::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .cv-preview-panel::-webkit-scrollbar-thumb,
+  .docx-preview::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+  }
+
+  .cv-preview-panel::-webkit-scrollbar-thumb:hover,
+  .docx-preview::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
   }
 }

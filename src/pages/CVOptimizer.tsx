@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { analyzeCVWithJob } from "@/services/openai";
+import { analyzeCVWithJob, testOpenAIConnection } from "@/services/openai";
 import * as mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
@@ -57,6 +57,7 @@ const CVOptimizer = () => {
   const [fileError, setFileError] = useState("");
   const [viewMode, setViewMode] = useState<"original" | "optimized">("original");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [openAIConnected, setOpenAIConnected] = useState<boolean | null>(null);
   const cvPreviewRef = useRef<HTMLDivElement>(null);
   const docxViewerRef = useRef<HTMLDivElement>(null);
 
@@ -68,6 +69,20 @@ const CVOptimizer = () => {
       setTimeout(() => renderDocxPreview(originalWordBuffer), 100);
     }
   }, [originalWordBuffer, viewMode]);
+
+  // Test OpenAI connection on component mount
+  useEffect(() => {
+    const testConnection = async () => {
+      try {
+        const isConnected = await testOpenAIConnection();
+        setOpenAIConnected(isConnected);
+      } catch (error) {
+        setOpenAIConnected(false);
+      }
+    };
+    testConnection();
+  }, []);
+
   const { toast } = useToast();
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
@@ -246,7 +261,7 @@ const CVOptimizer = () => {
     setCurrentStep("job-url");
   };
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
     if (!jobUrl.trim()) {
       toast({
         title: "Missing Job URL",
@@ -255,11 +270,51 @@ const CVOptimizer = () => {
       });
       return;
     }
+    
     setCurrentStep("analysis");
     setIsAnalyzing(true);
     
-    // Simulate analysis process
-    setTimeout(() => {
+    try {
+      // Call the real OpenAI analysis
+      const analysisResult = await analyzeCVWithJob(cvText, jobUrl);
+      
+      setRecommendations(analysisResult.recommendations);
+      setOptimizedCV(analysisResult.optimizedCV);
+      
+      // Convert the optimized CV to HTML for display
+      const optimizedHtml = analysisResult.optimizedCV
+        .split('\n\n')
+        .map(paragraph => {
+          const trimmed = paragraph.trim();
+          if (!trimmed) return '';
+          
+          // Check if it's likely a heading
+          const isHeading = trimmed.length < 60 && (
+            trimmed === trimmed.toUpperCase() ||
+            trimmed.endsWith(':') ||
+            /^[A-Z][A-Z\s&-]+$/.test(trimmed) ||
+            trimmed.match(/^(CONTACT|EXPERIENCE|EDUCATION|SKILLS|SUMMARY|OBJECTIVE)/i)
+          );
+          
+          if (isHeading) {
+            return `<h2 class="text-lg font-bold mt-4 mb-2 text-gray-800">${trimmed}</h2>`;
+          } else {
+            return `<p class="mb-2 text-gray-700">${trimmed}</p>`;
+          }
+        })
+        .join('');
+      
+      setOptimizedCVHtml(`<div class="cv-content">${optimizedHtml}</div>`);
+      
+      toast({
+        title: "Analysis Complete!",
+        description: `Found ${analysisResult.recommendations.length} recommendations to improve your CV.`,
+      });
+      
+    } catch (error) {
+      console.error('Analysis failed:', error);
+      
+      // Fallback to mock recommendations if OpenAI fails
       const mockRecommendations: Recommendation[] = [
         {
           type: "keyword",
@@ -294,9 +349,16 @@ const CVOptimizer = () => {
       setRecommendations(mockRecommendations);
       setOptimizedCV(cvText);
       setOptimizedCVHtml(cvHtml);
+      
+      toast({
+        title: "Using Demo Mode",
+        description: "Connect your OpenAI API key for real AI analysis. Showing sample recommendations.",
+        variant: "destructive",
+      });
+    } finally {
       setIsAnalyzing(false);
       setCurrentStep("results");
-    }, 3000);
+    }
   };
 
   const applyRecommendation = (index: number) => {
@@ -670,6 +732,33 @@ const CVOptimizer = () => {
                 </p>
               </div>
               
+              {/* OpenAI Connection Status */}
+              <div className="mb-6 p-4 rounded-lg border">
+                <div className="flex items-center gap-3">
+                  {openAIConnected === null ? (
+                    <>
+                      <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
+                      <span className="text-sm">Testing AI connection...</span>
+                    </>
+                  ) : openAIConnected ? (
+                    <>
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <span className="text-sm text-green-700">✓ AI analysis ready - powered by OpenAI GPT-4</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                      <span className="text-sm text-red-700">⚠️ AI unavailable - check your API key in .env file</span>
+                    </>
+                  )}
+                </div>
+                {openAIConnected && (
+                  <p className="text-xs text-green-600 mt-1">
+                    Real-time job analysis and personalized recommendations enabled
+                  </p>
+                )}
+              </div>
+              
               <div className="space-y-4">
                 <Input
                   type="url"
@@ -688,9 +777,15 @@ const CVOptimizer = () => {
                   className="w-full"
                   size="lg"
                 >
-                  Start AI Analysis
+                  {openAIConnected ? "Start AI Analysis" : "Start Analysis (Demo Mode)"}
                   <Zap className="ml-2 h-4 w-4" />
                 </Button>
+                
+                {!openAIConnected && (
+                  <p className="text-xs text-amber-600 text-center">
+                    Demo mode will show example recommendations. Add your OpenAI API key for real analysis.
+                  </p>
+                )}
               </div>
             </Card>
           </div>
@@ -698,17 +793,49 @@ const CVOptimizer = () => {
 
       case "analysis":
         return (
-          <div className="max-w-2xl mx-auto text-center">
+          <div className="max-w-3xl mx-auto text-center">
             <Card className="p-8 shadow-soft">
               <Zap className="h-16 w-16 text-primary mx-auto mb-4 animate-pulse" />
-              <h2 className="text-2xl font-bold mb-4">Analyzing Your CV</h2>
-              <p className="text-muted-foreground mb-6">
-                Our AI is analyzing your CV against the job requirements and generating personalized recommendations.
-              </p>
-              <div className="w-full bg-secondary rounded-full h-2 mb-4">
-                <div className="bg-primary h-2 rounded-full animate-pulse" style={{ width: "60%" }}></div>
+              <h2 className="text-2xl font-bold mb-4">AI Analysis in Progress</h2>
+              <div className="space-y-4">
+                <div className="text-left space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                    <span className="text-sm">Extracting job requirements from URL...</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-100"></div>
+                    <span className="text-sm">Analyzing CV content structure...</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-200"></div>
+                    <span className="text-sm">Generating AI-powered recommendations...</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-300"></div>
+                    <span className="text-sm">Optimizing for ATS compatibility...</span>
+                  </div>
+                </div>
+                
+                <div className="w-full bg-secondary rounded-full h-3 mt-6">
+                  <div className="bg-primary h-3 rounded-full animate-pulse" style={{ width: "75%" }}></div>
+                </div>
+                
+                <p className="text-sm text-muted-foreground mt-4">
+                  Our AI is carefully analyzing your CV against the job requirements. This may take 10-30 seconds...
+                </p>
+                
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h3 className="font-semibold text-blue-800 mb-2">What we're analyzing:</h3>
+                  <div className="text-sm text-blue-700 text-left">
+                    <p>• Keywords matching job requirements</p>
+                    <p>• Action verbs and professional language</p>
+                    <p>• Quantified achievements and metrics</p>
+                    <p>• ATS-friendly formatting</p>
+                    <p>• Industry-specific terminology</p>
+                  </div>
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">This usually takes 2-3 seconds...</p>
             </Card>
           </div>
         );
@@ -766,7 +893,7 @@ const CVOptimizer = () => {
                   {viewMode === "original" ? (
                     <>
                       {originalWordBuffer ? (
-                        <div className="w-full max-w-4xl mx-auto">
+                        <div className="w-full max-w-5xl mx-auto">
                           <div 
                             ref={docxViewerRef}
                             className="docx-preview w-full"
@@ -780,7 +907,7 @@ const CVOptimizer = () => {
                         </div>
                       ) : (
                         <div 
-                          className="original-text-preview w-full max-w-4xl mx-auto"
+                          className="original-text-preview w-full max-w-5xl mx-auto"
                           style={{
                             fontFamily: 'Arial, sans-serif',
                             lineHeight: '1.6',
@@ -795,7 +922,7 @@ const CVOptimizer = () => {
                   ) : (
                     <div 
                       ref={cvPreviewRef}
-                      className="cv-preview-content w-full max-w-4xl mx-auto"
+                      className="cv-preview-content w-full max-w-5xl mx-auto"
                       style={{
                         fontFamily: 'Arial, sans-serif',
                         lineHeight: '1.6',
@@ -822,27 +949,28 @@ const CVOptimizer = () => {
         }
         
         return (
-          <div className="cv-comparison-grid grid lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)]">
-            {/* Recommendations Panel */}
-            <Card className="recommendations-panel p-4 lg:p-6 shadow-soft overflow-auto lg:col-span-1">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg lg:text-xl font-semibold">AI Recommendations</h2>
-                <Badge variant="secondary">
-                  {recommendations.filter(r => r.applied).length}/{recommendations.length} Applied
+          <div className="cv-comparison-grid grid lg:grid-cols-4 gap-4 h-[calc(100vh-10rem)]">
+            {/* Recommendations Panel - Now takes 1/4 of space */}
+            <Card className="recommendations-panel p-3 lg:p-4 shadow-soft overflow-auto lg:col-span-1">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base lg:text-lg font-semibold">AI Recommendations</h2>
+                <Badge variant="secondary" className="text-xs">
+                  {recommendations.filter(r => r.applied).length}/{recommendations.length}
                 </Badge>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {recommendations.map((rec, index) => (
-                  <div key={index} className="border rounded-lg p-4 space-y-3">
+                  <div key={index} className="border rounded-lg p-3 space-y-2">
                     <div className="flex items-start justify-between">
-                      <Badge variant="outline" className="capitalize">
+                      <Badge variant="outline" className="capitalize text-xs">
                         {rec.type}
                       </Badge>
                       <Button
                         size="sm"
                         variant={rec.applied ? "default" : "outline"}
                         onClick={() => applyRecommendation(index)}
+                        className="text-xs px-2 py-1"
                       >
                         {rec.applied ? (
                           <>
@@ -858,17 +986,17 @@ const CVOptimizer = () => {
                       </Button>
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Original:</p>
-                        <p className="text-sm bg-muted/50 p-2 rounded">{rec.original}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Original:</p>
+                        <p className="text-xs bg-muted/50 p-2 rounded">{rec.original}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Suggested:</p>
-                        <p className="text-sm bg-primary/10 p-2 rounded border border-primary/20">{rec.suggested}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Suggested:</p>
+                        <p className="text-xs bg-primary/10 p-2 rounded border border-primary/20">{rec.suggested}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Reason:</p>
+                        <p className="text-xs font-medium text-muted-foreground">Reason:</p>
                         <p className="text-xs text-muted-foreground">{rec.reason}</p>
                       </div>
                     </div>
@@ -877,64 +1005,64 @@ const CVOptimizer = () => {
               </div>
             </Card>
 
-            {/* CV Preview Panel */}
-            <Card className="cv-preview-panel p-4 lg:p-6 shadow-soft overflow-auto lg:col-span-2">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 lg:mb-6 gap-4">
-                <h2 className="text-lg lg:text-xl font-semibold">CV Preview</h2>
-                <div className="flex gap-2 flex-wrap justify-start lg:justify-end">
+            {/* CV Preview Panel - Now takes 3/4 of space for maximum visibility */}
+            <Card className="cv-preview-panel p-3 lg:p-4 shadow-soft overflow-auto lg:col-span-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-3 lg:mb-4 gap-3">
+                <h2 className="text-base lg:text-lg font-semibold">CV Preview</h2>
+                <div className="flex gap-1 lg:gap-2 flex-wrap justify-start lg:justify-end">
                   <div className="flex rounded-md border border-input bg-background">
                     <Button
                       variant={viewMode === "original" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setViewMode("original")}
-                      className="rounded-r-none border-r text-xs lg:text-sm"
+                      className="rounded-r-none border-r text-xs px-2 py-1"
                     >
-                      <Eye className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                      <Eye className="h-3 w-3 mr-1" />
                       Original
                     </Button>
                     <Button
                       variant={viewMode === "optimized" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setViewMode("optimized")}
-                      className="rounded-l-none text-xs lg:text-sm"
+                      className="rounded-l-none text-xs px-2 py-1"
                     >
-                      <Edit3 className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                      <Edit3 className="h-3 w-3 mr-1" />
                       Optimized
                     </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => setIsFullscreen(true)} className="text-xs lg:text-sm">
-                    <Maximize2 className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                  <Button variant="outline" size="sm" onClick={() => setIsFullscreen(true)} className="text-xs px-2 py-1">
+                    <Maximize2 className="h-3 w-3 mr-1" />
                     <span className="hidden sm:inline">Fullscreen</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={copyToClipboard} className="text-xs lg:text-sm">
-                    <Copy className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                  <Button variant="outline" size="sm" onClick={copyToClipboard} className="text-xs px-2 py-1">
+                    <Copy className="h-3 w-3 mr-1" />
                     <span className="hidden sm:inline">Copy</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={downloadAsWord} className="text-xs lg:text-sm">
-                    <Download className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                  <Button variant="outline" size="sm" onClick={downloadAsWord} className="text-xs px-2 py-1">
+                    <Download className="h-3 w-3 mr-1" />
                     <span className="hidden sm:inline">Word</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={downloadAsPDF} className="text-xs lg:text-sm">
-                    <Download className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                  <Button variant="outline" size="sm" onClick={downloadAsPDF} className="text-xs px-2 py-1">
+                    <Download className="h-3 w-3 mr-1" />
                     <span className="hidden sm:inline">PDF</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={downloadAsText} className="text-xs lg:text-sm">
-                    <Download className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                  <Button variant="outline" size="sm" onClick={downloadAsText} className="text-xs px-2 py-1">
+                    <Download className="h-3 w-3 mr-1" />
                     <span className="hidden sm:inline">Text</span>
                   </Button>
                 </div>
               </div>
               
-              <div className="bg-white border rounded-lg p-2 lg:p-4 min-h-[400px] max-w-none w-full">
+              <div className="bg-white border rounded-lg p-2 lg:p-3 min-h-[500px] max-w-none w-full">
                 {viewMode === "original" ? (
                   <>
                     {originalWordBuffer ? (
-                      <div className="w-full" style={{ minHeight: '400px' }}>
+                      <div className="w-full" style={{ minHeight: '500px' }}>
                         <div 
                           ref={docxViewerRef}
                           className="docx-preview w-full"
                           style={{ 
-                            minHeight: '400px', 
+                            minHeight: '500px', 
                             border: '1px solid #e5e5e5',
                             width: '100%',
                             maxWidth: '100%',
