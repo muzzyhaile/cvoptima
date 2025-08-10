@@ -13,9 +13,18 @@ interface CVAnalysisResponse {
   jobSummary?: string;
 }
 
+const getFunctionsUrl = () => {
+  const base = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL;
+  if (!base) return null;
+  return base.replace(/\/$/, '');
+};
+
 export async function analyzeCVWithJob(cvText: string, jobUrl: string): Promise<CVAnalysisResponse> {
   try {
-    const resp = await fetch('/.netlify/functions/analyze', {
+    const base = getFunctionsUrl();
+    if (!base) throw new Error('Missing VITE_SUPABASE_FUNCTIONS_URL');
+
+    const resp = await fetch(`${base}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cvText, jobUrl })
@@ -42,7 +51,10 @@ export async function analyzeCVWithJob(cvText: string, jobUrl: string): Promise<
 
 export async function testOpenAIConnection(): Promise<boolean> {
   try {
-    const resp = await fetch('/.netlify/functions/analyze', {
+    const base = getFunctionsUrl();
+    if (!base) return false;
+
+    const resp = await fetch(`${base}/analyze`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cvText: 'ping', jobUrl: 'https://example.com/job' })
