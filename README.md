@@ -73,11 +73,10 @@ Backend (Supabase secrets):
 
 - `OPENAI_API_KEY` (required)
 
-## Netlify (Frontend Hosting)
+## Hosting
 
-- Ensure `public/_redirects` contains: `/* /index.html 200`
-- In Site settings > Environment, set `VITE_SUPABASE_FUNCTIONS_URL`
-- Remove Netlify Functions usage; Supabase Edge Functions are deployed via Supabase CLI
+- This project no longer uses Netlify. Host the Vite build output (`dist/`) on your preferred static hosting (e.g., Vercel, Cloudflare Pages, S3+CloudFront, etc.).
+- Supabase Edge Functions are deployed via the Supabase CLI and invoked from the frontend using `VITE_SUPABASE_FUNCTIONS_URL`.
 
 ## Tech Stack
 
