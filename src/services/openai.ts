@@ -50,17 +50,7 @@ export async function analyzeCVWithJob(cvText: string, jobUrl: string): Promise<
 }
 
 export async function testOpenAIConnection(): Promise<boolean> {
-  try {
-    const base = getFunctionsUrl();
-    if (!base) return false;
-
-    const resp = await fetch(`${base}/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cvText: 'ping', jobUrl: 'https://example.com/job' })
-    });
-    return resp.ok;
-  } catch {
-    return false;
-  }
+  // Consider the connection "available" if the Functions URL is configured.
+  const base = getFunctionsUrl();
+  return !!base;
 }

@@ -261,7 +261,7 @@ const CVOptimizer = () => {
     setCurrentStep("job-url");
   };
 
-  const startAnalysis = () => {
+  const startAnalysis = async () => {
     if (!jobUrl.trim()) {
       toast({
         title: "Missing Job URL",
@@ -270,50 +270,100 @@ const CVOptimizer = () => {
       });
       return;
     }
-    
+
     setCurrentStep("analysis");
     setIsAnalyzing(true);
 
-    // Simulate analysis process
-    setTimeout(() => {
+    try {
+      if (openAIConnected) {
+        const resp = await analyzeCVWithJob(cvText, jobUrl);
+        const recs = (resp.recommendations || []).map(r => ({ ...r, applied: !!r.applied }));
+        const optimized = resp.optimizedCV || cvText;
+
+        setRecommendations(recs);
+        setOptimizedCV(optimized);
+        setOptimizedCVHtml(buildBaseHtml(optimized, ""));
+        setViewMode("original");
+        setCurrentStep("results");
+        toast({
+          title: "AI analysis complete",
+          description: "Recommendations generated from your CV and the job ad.",
+        });
+        return;
+      }
+
+      // Demo mode fallback
+      setTimeout(() => {
+        const mockRecommendations: Recommendation[] = [
+          {
+            type: "keyword",
+            original: "JavaScript",
+            suggested: "React, TypeScript, JavaScript ES6+",
+            reason: "Job requires React and TypeScript specifically",
+            applied: false,
+          },
+          {
+            type: "phrase",
+            original: "Worked with team members",
+            suggested: "Collaborated with cross-functional teams of 5+ developers",
+            reason: "More specific and quantified",
+            applied: false,
+          },
+          {
+            type: "achievement",
+            original: "Developed web applications",
+            suggested: "Developed 3+ responsive web applications serving 10,000+ users",
+            reason: "Quantified achievements are more impactful",
+            applied: false,
+          },
+          {
+            type: "structure",
+            original: "Software Developer",
+            suggested: "Senior Software Engineer | React & TypeScript Specialist",
+            reason: "Matches job title and emphasizes key technologies",
+            applied: false,
+          },
+        ];
+
+        setRecommendations(mockRecommendations);
+        setOptimizedCV(cvText);
+        setOptimizedCVHtml(buildBaseHtml(cvText, cvHtml));
+        setIsAnalyzing(false);
+        setViewMode("original");
+        setCurrentStep("results");
+      }, 3000);
+    } catch (error) {
+      console.error("AI analysis failed, falling back to demo:", error);
+      toast({
+        title: "AI analysis failed",
+        description: "Falling back to demo recommendations.",
+        variant: "destructive",
+      });
+      setOpenAIConnected(false);
+      // Quick demo fallback without extra delay
       const mockRecommendations: Recommendation[] = [
         {
           type: "keyword",
-          original: "JavaScript",
-          suggested: "React, TypeScript, JavaScript ES6+",
-          reason: "Job requires React and TypeScript specifically",
-          applied: false
-        },
-        {
-          type: "phrase",
-          original: "Worked with team members",
-          suggested: "Collaborated with cross-functional teams of 5+ developers",
-          reason: "More specific and quantified",
-          applied: false
+          original: "worked on",
+          suggested: "developed and implemented",
+          reason: "Action verbs improve ATS scoring",
+          applied: false,
         },
         {
           type: "achievement",
-          original: "Developed web applications",
-          suggested: "Developed 3+ responsive web applications serving 10,000+ users",
-          reason: "Quantified achievements are more impactful",
-          applied: false
+          original: "improved performance",
+          suggested: "increased system performance by 40%",
+          reason: "Quantify impact for hiring managers",
+          applied: false,
         },
-        {
-          type: "structure",
-          original: "Software Developer",
-          suggested: "Senior Software Engineer | React & TypeScript Specialist",
-          reason: "Matches job title and emphasizes key technologies",
-          applied: false
-        }
       ];
-      
       setRecommendations(mockRecommendations);
       setOptimizedCV(cvText);
-      setOptimizedCVHtml(cvHtml);
-      setIsAnalyzing(false);
-      setViewMode("original"); // ensure Original is the first tab selected
+      setOptimizedCVHtml(buildBaseHtml(cvText, cvHtml));
       setCurrentStep("results");
-    }, 3000);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const applyRecommendation = (index: number) => {
