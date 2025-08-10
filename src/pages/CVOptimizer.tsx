@@ -742,12 +742,12 @@ const CVOptimizer = () => {
                   ) : openAIConnected ? (
                     <>
                       <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="text-sm text-green-700">✓ AI analysis ready - powered by OpenAI GPT-4</span>
+                      <span className="text-sm text-green-700">✓ AI analysis ready</span>
                     </>
                   ) : (
                     <>
                       <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span className="text-sm text-red-700">⚠️ AI unavailable - check your API key in .env file</span>
+                      <span className="text-sm text-red-700">⚠️ AI unavailable - configure Supabase Edge Function and set VITE_SUPABASE_FUNCTIONS_URL</span>
                     </>
                   )}
                 </div>
@@ -782,7 +782,7 @@ const CVOptimizer = () => {
                 
                 {!openAIConnected && (
                   <p className="text-xs text-amber-600 text-center">
-                    Demo mode will show example recommendations. Add your OpenAI API key for real analysis.
+                    Demo mode will show example recommendations. Configure your Supabase Edge Function and set VITE_SUPABASE_FUNCTIONS_URL for real analysis.
                   </p>
                 )}
               </div>
