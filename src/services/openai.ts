@@ -1,10 +1,19 @@
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true // Enable client-side usage
-});
+// Initialize OpenAI client safely for browser usage
+const apiKey = (import.meta as any)?.env?.VITE_OPENAI_API_KEY as string | undefined;
+let openai: OpenAI | null = null;
+
+try {
+  if (apiKey && apiKey.trim().length > 0) {
+    openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+  } else {
+    console.warn('[OpenAI] VITE_OPENAI_API_KEY is missing. Running in demo mode.');
+  }
+} catch (e) {
+  console.error('[OpenAI] Failed to initialize client:', e);
+  openai = null;
+}
 
 interface CVAnalysisResponse {
   recommendations: {
@@ -21,8 +30,9 @@ interface CVAnalysisResponse {
 // Function to extract job description from URL
 async function extractJobFromUrl(jobUrl: string): Promise<string> {
   try {
-    // For now, we'll use OpenAI to analyze the job URL
-    // In a production environment, you might want to use web scraping
+    if (!openai) {
+      return `Job posting provided: ${jobUrl}. OpenAI is not configured; using general best practices.`;
+    }
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
@@ -33,15 +43,7 @@ async function extractJobFromUrl(jobUrl: string): Promise<string> {
         {
           role: "user",
           content: `Please analyze this job posting URL and extract the key requirements: ${jobUrl}
-          
-          Since I cannot directly access the URL, please provide general job analysis guidance based on the URL domain and any visible job indicators. Focus on:
-          1. Likely required skills
-          2. Common industry keywords
-          3. Professional qualifications
-          4. Experience level indicators
-          
-          Provide a structured summary of what this job likely requires.`
-        }
+          \nIf you cannot access the URL, provide general guidance based on typical roles from the domain, including:\n1) likely required skills\n2) common keywords\n3) qualifications\n4) experience level.\n`}
       ],
       temperature: 0.3,
       max_tokens: 500,
@@ -56,9 +58,22 @@ async function extractJobFromUrl(jobUrl: string): Promise<string> {
 
 export async function analyzeCVWithJob(cvText: string, jobUrl: string): Promise<CVAnalysisResponse> {
   try {
+    // If OpenAI not configured, return demo fallback immediately
+    if (!openai) {
+      return {
+        recommendations: [
+          { type: "keyword", original: "worked on", suggested: "developed and implemented", reason: "Use strong action verbs for ATS and clarity", applied: false },
+          { type: "achievement", original: "improved performance", suggested: "increased performance by 40% through code optimization", reason: "Quantify impact to stand out", applied: false },
+          { type: "phrase", original: "team player", suggested: "collaborated with cross-functional teams of 8+ members", reason: "Make soft skills concrete and specific", applied: false },
+          { type: "structure", original: "responsible for managing", suggested: "led and coordinated", reason: "Leadership-oriented language scores better", applied: false },
+        ],
+        optimizedCV: cvText,
+        jobSummary: `OpenAI is not configured. Provide a VITE_OPENAI_API_KEY to enable real analysis for ${jobUrl}.`
+      };
+    }
+
     // First, analyze the job posting
     const jobAnalysis = await extractJobFromUrl(jobUrl);
-    
     const prompt = `
 You are an expert CV optimization specialist with deep knowledge of ATS systems and hiring practices. Analyze this CV against the job requirements and provide specific, actionable recommendations.
 
@@ -83,42 +98,21 @@ Please provide your analysis in the following JSON format:
   "jobSummary": "brief summary of key job requirements identified"
 }
 
-OPTIMIZATION GUIDELINES:
-1. **Keywords**: Include industry-specific terms and technologies mentioned in the job
-2. **Quantified Achievements**: Replace vague statements with measurable results
-3. **Action Verbs**: Use strong, action-oriented language (Led, Implemented, Achieved, etc.)
-4. **ATS Optimization**: Ensure keywords match job requirements for ATS scanning
-5. **Structure**: Improve formatting and organization for better readability
-6. **Relevance**: Highlight experiences most relevant to the target role
-
-Provide 6-10 specific, high-impact recommendations that will significantly improve this CV's effectiveness for the target job. Focus on changes that will have the biggest impact on getting past ATS systems and impressing hiring managers.
-
-Make sure the optimized CV maintains the original structure while incorporating improvements.
-`;
+Guidelines: Prefer quantified achievements, use strong action verbs, and match keywords from the job analysis while preserving original structure.`;
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4", // Using GPT-4 for better analysis
+      model: "gpt-4",
       messages: [
-        {
-          role: "system",
-          content: "You are an expert CV optimization specialist. Always respond with valid JSON format. Focus on actionable, specific improvements that will help the candidate get hired."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
+        { role: "system", content: "You are an expert CV optimization specialist. Always respond with valid JSON only." },
+        { role: "user", content: prompt }
       ],
-      temperature: 0.3, // Lower temperature for more consistent results
+      temperature: 0.3,
       max_tokens: 3000,
     });
 
     const response = completion.choices[0].message.content;
-    
-    if (!response) {
-      throw new Error('No response from OpenAI');
-    }
+    if (!response) throw new Error('No response from OpenAI');
 
-    // Parse the JSON response
     try {
       const analysisResult = JSON.parse(response);
       return analysisResult;
@@ -130,47 +124,12 @@ Make sure the optimized CV maintains the original structure while incorporating 
 
   } catch (error) {
     console.error('Error analyzing CV with OpenAI:', error);
-    
-    // Return enhanced fallback recommendations
     return {
       recommendations: [
-        {
-          type: "keyword",
-          original: "worked on",
-          suggested: "developed and implemented",
-          reason: "More specific action verbs improve ATS scoring and show proactivity",
-          applied: false
-        },
-        {
-          type: "achievement",
-          original: "improved performance",
-          suggested: "increased system performance by 40% through code optimization",
-          reason: "Quantified achievements are 3x more likely to catch recruiter attention",
-          applied: false
-        },
-        {
-          type: "phrase",
-          original: "team player",
-          suggested: "collaborated with cross-functional teams of 8+ members",
-          reason: "Specific collaboration details demonstrate real teamwork experience",
-          applied: false
-        },
-        {
-          type: "structure",
-          original: "responsible for managing",
-          suggested: "led and coordinated",
-          reason: "Leadership language shows ownership and management potential",
-          applied: false
-        },
-        {
-          type: "keyword",
-          original: "programming",
-          suggested: "full-stack development using React, Node.js, and Python",
-          reason: "Specific technology stacks match modern job requirements",
-          applied: false
-        }
+        { type: "keyword", original: "worked on", suggested: "developed and implemented", reason: "More specific action verbs improve ATS scoring and clarity", applied: false },
+        { type: "achievement", original: "improved performance", suggested: "increased system performance by 40% through code optimization", reason: "Quantified achievements draw attention", applied: false },
       ],
-      optimizedCV: "⚠️ OpenAI connection failed. Please check your API key in the .env file. Your original CV content is preserved below.\n\n" + cvText,
+      optimizedCV: cvText,
       jobSummary: "Unable to analyze job posting - using general CV optimization best practices"
     };
   }
@@ -178,12 +137,12 @@ Make sure the optimized CV maintains the original structure while incorporating 
 
 export async function testOpenAIConnection(): Promise<boolean> {
   try {
+    if (!openai) return false;
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [{ role: "user", content: "Say hello" }],
       max_tokens: 10,
     });
-    
     return !!completion.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI connection test failed:', error);

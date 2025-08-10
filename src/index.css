@@ -438,4 +438,36 @@
   .docx-preview::-webkit-scrollbar-thumb:hover {
     background: #a1a1a1;
   }
+
+  /* AI Highlight overlays inside CV preview */
+  .ai-highlight {
+    background: rgba(250, 204, 21, 0.25); /* amber-400 @ 25% */
+    outline: 1px dashed rgba(250, 204, 21, 0.7);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: box-shadow 0.1s ease, background 0.1s ease, outline-color 0.1s ease;
+  }
+  .ai-highlight:hover {
+    background: rgba(250, 204, 21, 0.4);
+    outline-color: rgba(250, 204, 21, 1);
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
+  }
+  .ai-highlight[data-active="true"] {
+    background: rgba(34, 197, 94, 0.30); /* green-500 @ 30% for applied */
+    outline: 1px solid rgba(34, 197, 94, 0.9);
+  }
+  .ai-highlight[data-active="true"]:hover {
+    background: rgba(34, 197, 94, 0.45);
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+  }
+  .ai-highlight:focus {
+    outline: 2px solid #facc15;
+    outline-offset: 1px;
+  }
+
+  /* Make highlighted spans inline-block to improve click target while preserving flow */
+  .ai-highlight { display: inline; padding: 0 2px; }
+
+  /* Ensure highlights are visible within prose constraints */
+  .prose .ai-highlight { max-width: 100%; }
 }

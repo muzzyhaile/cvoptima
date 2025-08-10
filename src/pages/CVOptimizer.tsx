@@ -57,18 +57,18 @@ const CVOptimizer = () => {
   const [fileError, setFileError] = useState("");
   const [viewMode, setViewMode] = useState<"original" | "optimized">("original");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showHighlights, setShowHighlights] = useState(true);
   const [openAIConnected, setOpenAIConnected] = useState<boolean | null>(null);
   const cvPreviewRef = useRef<HTMLDivElement>(null);
   const docxViewerRef = useRef<HTMLDivElement>(null);
 
   // UseEffect to render Word document when buffer and ref are ready
   useEffect(() => {
-    if (originalWordBuffer && docxViewerRef.current && viewMode === "original") {
-      console.log('useEffect: Rendering DOCX preview...');
-      // Add small delay to ensure DOM is ready
+    if (originalWordBuffer && docxViewerRef.current && viewMode === "original" && !showHighlights) {
+      // Only render DOCX when not showing highlights (highlights use text view)
       setTimeout(() => renderDocxPreview(originalWordBuffer), 100);
     }
-  }, [originalWordBuffer, viewMode]);
+  }, [originalWordBuffer, viewMode, showHighlights]);
 
   // Test OpenAI connection on component mount
   useEffect(() => {
@@ -261,7 +261,7 @@ const CVOptimizer = () => {
     setCurrentStep("job-url");
   };
 
-  const startAnalysis = async () => {
+  const startAnalysis = () => {
     if (!jobUrl.trim()) {
       toast({
         title: "Missing Job URL",
@@ -273,48 +273,9 @@ const CVOptimizer = () => {
     
     setCurrentStep("analysis");
     setIsAnalyzing(true);
-    
-    try {
-      // Call the real OpenAI analysis
-      const analysisResult = await analyzeCVWithJob(cvText, jobUrl);
-      
-      setRecommendations(analysisResult.recommendations);
-      setOptimizedCV(analysisResult.optimizedCV);
-      
-      // Convert the optimized CV to HTML for display
-      const optimizedHtml = analysisResult.optimizedCV
-        .split('\n\n')
-        .map(paragraph => {
-          const trimmed = paragraph.trim();
-          if (!trimmed) return '';
-          
-          // Check if it's likely a heading
-          const isHeading = trimmed.length < 60 && (
-            trimmed === trimmed.toUpperCase() ||
-            trimmed.endsWith(':') ||
-            /^[A-Z][A-Z\s&-]+$/.test(trimmed) ||
-            trimmed.match(/^(CONTACT|EXPERIENCE|EDUCATION|SKILLS|SUMMARY|OBJECTIVE)/i)
-          );
-          
-          if (isHeading) {
-            return `<h2 class="text-lg font-bold mt-4 mb-2 text-gray-800">${trimmed}</h2>`;
-          } else {
-            return `<p class="mb-2 text-gray-700">${trimmed}</p>`;
-          }
-        })
-        .join('');
-      
-      setOptimizedCVHtml(`<div class="cv-content">${optimizedHtml}</div>`);
-      
-      toast({
-        title: "Analysis Complete!",
-        description: `Found ${analysisResult.recommendations.length} recommendations to improve your CV.`,
-      });
-      
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      
-      // Fallback to mock recommendations if OpenAI fails
+
+    // Simulate analysis process
+    setTimeout(() => {
       const mockRecommendations: Recommendation[] = [
         {
           type: "keyword",
@@ -349,35 +310,33 @@ const CVOptimizer = () => {
       setRecommendations(mockRecommendations);
       setOptimizedCV(cvText);
       setOptimizedCVHtml(cvHtml);
-      
-      toast({
-        title: "Using Demo Mode",
-        description: "Connect your OpenAI API key for real AI analysis. Showing sample recommendations.",
-        variant: "destructive",
-      });
-    } finally {
       setIsAnalyzing(false);
+      setViewMode("original"); // ensure Original is the first tab selected
       setCurrentStep("results");
-    }
+    }, 3000);
   };
 
   const applyRecommendation = (index: number) => {
     const newRecommendations = [...recommendations];
     newRecommendations[index].applied = !newRecommendations[index].applied;
     setRecommendations(newRecommendations);
-    
-    // Update optimized CV
+
+    // Recompute optimized text and html
     let updatedCV = cvText;
-    let updatedCVHtml = cvHtml;
-    newRecommendations.forEach(rec => {
+    let updatedHtml = buildBaseHtml(cvText, cvHtml);
+
+    newRecommendations.forEach((rec, i) => {
       if (rec.applied) {
-        updatedCV = updatedCV.replace(rec.original, rec.suggested);
-        updatedCVHtml = updatedCVHtml.replace(rec.original, `<strong>${rec.suggested}</strong>`);
+        const pattern = escapeRegExp(rec.original);
+        const regex = new RegExp(pattern, 'g');
+        updatedCV = updatedCV.replace(regex, rec.suggested);
+        updatedHtml = updatedHtml.replace(new RegExp(pattern, 'g'), `<strong>${rec.suggested}</strong>`);
       }
     });
+
     setOptimizedCV(updatedCV);
-    setOptimizedCVHtml(updatedCVHtml);
-    
+    setOptimizedCVHtml(updatedHtml);
+
     toast({
       title: newRecommendations[index].applied ? "Change Applied" : "Change Reverted",
       description: `"${newRecommendations[index].original}" has been ${newRecommendations[index].applied ? 'updated' : 'reverted'}.`,
@@ -661,6 +620,46 @@ const CVOptimizer = () => {
       case "analysis": return 75;
       case "results": return 100;
       default: return 0;
+    }
+  };
+
+  // Helpers for highlights
+  const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const stripExistingHighlights = (html: string) => html
+    ? html.replace(/<span[^>]*class=\"[^\"]*ai-highlight[^\"]*\"[^>]*>([\s\S]*?)<\/span>/gi, "$1")
+    : html;
+
+  const buildBaseHtml = (text: string, html: string) => {
+    if (html) return html;
+    return `<div class="cv-content">${(text || '').split('\n').map(line => `<p>${line || '&nbsp;'}</p>`).join('')}</div>`;
+  };
+
+  const buildHighlightedHtml = (mode: "original" | "optimized") => {
+    if (!showHighlights) return mode === "optimized" ? optimizedCVHtml || buildBaseHtml(cvText, cvHtml) : buildBaseHtml(cvText, cvHtml);
+    let html = stripExistingHighlights(buildBaseHtml(cvText, cvHtml));
+
+    recommendations.forEach((rec, index) => {
+      const pattern = escapeRegExp(rec.original);
+      const regex = new RegExp(pattern, 'gi');
+
+      if (mode === "optimized" && rec.applied) {
+        // Replace with suggested and strong highlight for applied
+        html = html.replace(regex, `<span class="ai-highlight" data-rec-index="${index}" data-active="true">${rec.suggested}</span>`);
+      } else {
+        // Highlight original occurrences
+        html = html.replace(regex, `<span class="ai-highlight" data-rec-index="${index}" data-active="${rec.applied ? 'true' : 'false'}">$&</span>`);
+      }
+    });
+    return html;
+  };
+
+  const onPreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const el = target.closest('.ai-highlight') as HTMLElement | null;
+    if (!el) return;
+    const idx = Number(el.dataset.recIndex);
+    if (!Number.isNaN(idx)) {
+      applyRecommendation(idx);
     }
   };
 
@@ -949,9 +948,9 @@ const CVOptimizer = () => {
         }
         
         return (
-          <div className="cv-comparison-grid grid lg:grid-cols-4 gap-4 h-[calc(100vh-10rem)]">
-            {/* Recommendations Panel - Now takes 1/4 of space */}
-            <Card className="recommendations-panel p-3 lg:p-4 shadow-soft overflow-auto lg:col-span-1">
+          <div className="cv-comparison-grid grid lg:grid-cols-4 gap-4 lg:gap-6 h-[calc(100vh-12rem)]">
+            {/* Recommendations Panel */}
+            <Card className="recommendations-panel p-3 lg:p-6 shadow-soft overflow-auto lg:col-span-1">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base lg:text-lg font-semibold">AI Recommendations</h2>
                 <Badge variant="secondary" className="text-xs">
@@ -1005,31 +1004,41 @@ const CVOptimizer = () => {
               </div>
             </Card>
 
-            {/* CV Preview Panel - Now takes 3/4 of space for maximum visibility */}
-            <Card className="cv-preview-panel p-3 lg:p-4 shadow-soft overflow-auto lg:col-span-3">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-3 lg:mb-4 gap-3">
-                <h2 className="text-base lg:text-lg font-semibold">CV Preview</h2>
-                <div className="flex gap-1 lg:gap-2 flex-wrap justify-start lg:justify-end">
+            {/* CV Preview Panel */}
+            <Card className="cv-preview-panel p-3 lg:p-6 shadow-soft overflow-auto lg:col-span-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-4 lg:mb-6 gap-3">
+                <h2 className="text-lg lg:text-xl font-semibold">CV Preview</h2>
+                <div className="flex gap-2 flex-wrap justify-start lg:justify-end">
                   <div className="flex rounded-md border border-input bg-background">
                     <Button
                       variant={viewMode === "original" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setViewMode("original")}
-                      className="rounded-r-none border-r text-xs px-2 py-1"
+                      className="rounded-r-none border-r text-xs lg:text-sm"
                     >
-                      <Eye className="h-3 w-3 mr-1" />
+                      <Eye className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
                       Original
                     </Button>
                     <Button
                       variant={viewMode === "optimized" ? "default" : "ghost"}
                       size="sm"
                       onClick={() => setViewMode("optimized")}
-                      className="rounded-l-none text-xs px-2 py-1"
+                      className="rounded-l-none text-xs lg:text-sm"
                     >
-                      <Edit3 className="h-3 w-3 mr-1" />
+                      <Edit3 className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
                       Optimized
                     </Button>
                   </div>
+
+                  <Button
+                    variant={showHighlights ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowHighlights(v => !v)}
+                    className="text-xs lg:text-sm"
+                  >
+                    {showHighlights ? 'Highlights: On' : 'Highlights: Off'}
+                  </Button>
+
                   <Button variant="outline" size="sm" onClick={() => setIsFullscreen(true)} className="text-xs px-2 py-1">
                     <Maximize2 className="h-3 w-3 mr-1" />
                     <span className="hidden sm:inline">Fullscreen</span>
@@ -1052,87 +1061,50 @@ const CVOptimizer = () => {
                   </Button>
                 </div>
               </div>
-              
-              <div className="bg-white border rounded-lg p-2 lg:p-3 min-h-[500px] max-w-none w-full">
+
+              <div className="bg-white border rounded-lg p-2 lg:p-4 min-h-[400px] max-w-none w-full" onClick={onPreviewClick}>
                 {viewMode === "original" ? (
                   <>
-                    {originalWordBuffer ? (
-                      <div className="w-full" style={{ minHeight: '500px' }}>
-                        <div 
+                    {showHighlights ? (
+                      <div
+                        className="prose prose-sm max-w-none w-full"
+                        dangerouslySetInnerHTML={{ __html: buildHighlightedHtml("original") }}
+                      />
+                    ) : originalWordBuffer ? (
+                      <div className="w-full" style={{ minHeight: '400px' }}>
+                        <div
                           ref={docxViewerRef}
                           className="docx-preview w-full"
-                          style={{ 
-                            minHeight: '500px', 
-                            border: '1px solid #e5e5e5',
-                            width: '100%',
-                            maxWidth: '100%',
-                            overflow: 'auto'
-                          }}
+                          style={{ minHeight: '400px', border: '1px solid #e5e5e5', width: '100%', maxWidth: '100%', overflow: 'auto' }}
                         />
-                        {/* Fallback text preview */}
-                        <div className="mt-4 p-4 bg-gray-50 rounded">
-                          <p className="text-sm text-gray-600 mb-2">Debug Info:</p>
-                          <div className="text-xs text-gray-500">
-                            <div>Buffer Size: {originalWordBuffer.byteLength} bytes</div>
-                            <div>File Name: {originalFileName}</div>
-                            <div>Text Length: {cvText.length} characters</div>
-                          </div>
-                          <details className="mt-2">
-                            <summary className="text-sm cursor-pointer">Show extracted text (fallback)</summary>
-                            <div 
-                              className="mt-2 p-2 bg-white rounded text-sm max-h-48 overflow-y-auto"
-                              style={{ whiteSpace: 'pre-wrap' }}
-                            >
-                              {cvText}
-                            </div>
-                          </details>
-                        </div>
-                      </div>
-                    ) : cvFile?.name.endsWith('.pdf') ? (
-                      <div className="text-center py-8">
-                        <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                        <p className="text-muted-foreground">PDF Preview</p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Original PDF format preserved for download
-                        </p>
                       </div>
                     ) : (
-                      <div 
+                      <div
                         className="original-text-preview w-full"
-                        style={{
-                          fontFamily: 'Arial, sans-serif',
-                          lineHeight: '1.6',
-                          color: '#333',
-                          whiteSpace: 'pre-wrap',
-                          maxWidth: '100%',
-                          wordWrap: 'break-word'
-                        }}
+                        style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6', color: '#333', whiteSpace: 'pre-wrap', maxWidth: '100%', wordWrap: 'break-word' }}
                       >
                         {cvText || "No original document to display"}
                       </div>
                     )}
                   </>
                 ) : (
-                  <div 
+                  <div
                     ref={cvPreviewRef}
                     className="cv-preview-content w-full"
-                    style={{
-                      fontFamily: 'Arial, sans-serif',
-                      lineHeight: '1.6',
-                      color: '#333',
-                      backgroundColor: '#ffffff',
-                      maxWidth: '100%'
-                    }}
+                    style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6', color: '#333', backgroundColor: '#ffffff', maxWidth: '100%' }}
                   >
-                    {optimizedCVHtml ? (
-                      <div 
+                    {showHighlights ? (
+                      <div
+                        className="prose prose-sm max-w-none w-full"
+                        dangerouslySetInnerHTML={{ __html: buildHighlightedHtml("optimized") }}
+                      />
+                    ) : optimizedCVHtml ? (
+                      <div
                         dangerouslySetInnerHTML={{ __html: optimizedCVHtml }}
                         className="prose prose-sm max-w-none w-full [&>p]:mb-2 [&>h1]:text-xl [&>h1]:font-bold [&>h1]:mb-3 [&>h2]:text-lg [&>h2]:font-semibold [&>h2]:mb-2 [&>h3]:text-base [&>h3]:font-medium [&>h3]:mb-1 [&_*]:max-w-none"
                       />
                     ) : (
-                      <div className="text-gray-500 text-center py-8">
-                        Your optimized CV content will appear here after applying recommendations...
-                      </div>
+                      <div className="text-gray-500 text-center py-8">Your optimized CV content will appear here after applying recommendations...</div>
                     )}
                   </div>
                 )}
