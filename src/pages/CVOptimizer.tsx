@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { analyzeCVWithJob, testOpenAIConnection } from "@/services/openai";
+import { analyzeCVWithJob } from "@/services/openai";
 import * as mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
@@ -58,7 +58,7 @@ const CVOptimizer = () => {
   const [viewMode, setViewMode] = useState<"original" | "optimized">("original");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showHighlights, setShowHighlights] = useState(true);
-  const [openAIConnected, setOpenAIConnected] = useState<boolean | null>(null);
+  const [openAIConnected, setOpenAIConnected] = useState<boolean | null>(true);
   const cvPreviewRef = useRef<HTMLDivElement>(null);
   const docxViewerRef = useRef<HTMLDivElement>(null);
 
@@ -69,19 +69,6 @@ const CVOptimizer = () => {
       setTimeout(() => renderDocxPreview(originalWordBuffer), 100);
     }
   }, [originalWordBuffer, viewMode, showHighlights]);
-
-  // Test OpenAI connection on component mount
-  useEffect(() => {
-    const testConnection = async () => {
-      try {
-        const isConnected = await testOpenAIConnection();
-        setOpenAIConnected(isConnected);
-      } catch (error) {
-        setOpenAIConnected(false);
-      }
-    };
-    testConnection();
-  }, []);
 
   const { toast } = useToast();
 
@@ -275,92 +262,31 @@ const CVOptimizer = () => {
     setIsAnalyzing(true);
 
     try {
-      if (openAIConnected) {
-        const resp = await analyzeCVWithJob(cvText, jobUrl);
-        const recs = (resp.recommendations || []).map(r => ({ ...r, applied: !!r.applied }));
-        const optimized = resp.optimizedCV || cvText;
+      // Always attempt real analysis; fall back on failure
+      const resp = await analyzeCVWithJob(cvText, jobUrl);
+      const recs = (resp.recommendations || []).map(r => ({ ...r, applied: !!r.applied }));
+      const optimized = resp.optimizedCV || cvText;
 
-        setRecommendations(recs);
-        setOptimizedCV(optimized);
-        setOptimizedCVHtml(buildBaseHtml(optimized, ""));
-        setViewMode("original");
-        setCurrentStep("results");
-        toast({
-          title: "AI analysis complete",
-          description: "Recommendations generated from your CV and the job ad.",
-        });
-        return;
-      }
-
-      // Demo mode fallback
-      setTimeout(() => {
-        const mockRecommendations: Recommendation[] = [
-          {
-            type: "keyword",
-            original: "JavaScript",
-            suggested: "React, TypeScript, JavaScript ES6+",
-            reason: "Job requires React and TypeScript specifically",
-            applied: false,
-          },
-          {
-            type: "phrase",
-            original: "Worked with team members",
-            suggested: "Collaborated with cross-functional teams of 5+ developers",
-            reason: "More specific and quantified",
-            applied: false,
-          },
-          {
-            type: "achievement",
-            original: "Developed web applications",
-            suggested: "Developed 3+ responsive web applications serving 10,000+ users",
-            reason: "Quantified achievements are more impactful",
-            applied: false,
-          },
-          {
-            type: "structure",
-            original: "Software Developer",
-            suggested: "Senior Software Engineer | React & TypeScript Specialist",
-            reason: "Matches job title and emphasizes key technologies",
-            applied: false,
-          },
-        ];
-
-        setRecommendations(mockRecommendations);
-        setOptimizedCV(cvText);
-        setOptimizedCVHtml(buildBaseHtml(cvText, cvHtml));
-        setIsAnalyzing(false);
-        setViewMode("original");
-        setCurrentStep("results");
-      }, 3000);
+      setRecommendations(recs);
+      setOptimizedCV(optimized);
+      setOptimizedCVHtml(buildBaseHtml(optimized, ""));
+      setViewMode("original");
+      setCurrentStep("results");
+      toast({
+        title: "AI analysis complete",
+        description: "Recommendations generated from your CV and the job ad.",
+      });
+      return;
     } catch (error) {
-      console.error("AI analysis failed, falling back to demo:", error);
+      console.error("AI analysis failed, showing error:", error);
       toast({
         title: "AI analysis failed",
-        description: "Falling back to demo recommendations.",
+        description: "Please check your Supabase Function URL or try again shortly.",
         variant: "destructive",
       });
-      setOpenAIConnected(false);
-      // Quick demo fallback without extra delay
-      const mockRecommendations: Recommendation[] = [
-        {
-          type: "keyword",
-          original: "worked on",
-          suggested: "developed and implemented",
-          reason: "Action verbs improve ATS scoring",
-          applied: false,
-        },
-        {
-          type: "achievement",
-          original: "improved performance",
-          suggested: "increased system performance by 40%",
-          reason: "Quantify impact for hiring managers",
-          applied: false,
-        },
-      ];
-      setRecommendations(mockRecommendations);
-      setOptimizedCV(cvText);
-      setOptimizedCVHtml(buildBaseHtml(cvText, cvHtml));
-      setCurrentStep("results");
+      setIsAnalyzing(false);
+      setCurrentStep("job-url");
+      return;
     } finally {
       setIsAnalyzing(false);
     }
@@ -781,33 +707,6 @@ const CVOptimizer = () => {
                 </p>
               </div>
               
-              {/* OpenAI Connection Status */}
-              <div className="mb-6 p-4 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  {openAIConnected === null ? (
-                    <>
-                      <div className="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div>
-                      <span className="text-sm">Testing AI connection...</span>
-                    </>
-                  ) : openAIConnected ? (
-                    <>
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                      <span className="text-sm text-green-700">✓ AI analysis ready</span>
-                    </>
-                  ) : (
-                    <>
-                      <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                      <span className="text-sm text-red-700">⚠️ AI unavailable - configure Supabase Edge Function and set VITE_SUPABASE_FUNCTIONS_URL</span>
-                    </>
-                  )}
-                </div>
-                {openAIConnected && (
-                  <p className="text-xs text-green-600 mt-1">
-                    Real-time job analysis and personalized recommendations enabled
-                  </p>
-                )}
-              </div>
-              
               <div className="space-y-4">
                 <Input
                   type="url"
@@ -826,15 +725,9 @@ const CVOptimizer = () => {
                   className="w-full"
                   size="lg"
                 >
-                  {openAIConnected ? "Start AI Analysis" : "Start Analysis (Demo Mode)"}
+                  Start AI Analysis
                   <Zap className="ml-2 h-4 w-4" />
                 </Button>
-                
-                {!openAIConnected && (
-                  <p className="text-xs text-amber-600 text-center">
-                    Demo mode will show example recommendations. Configure your Supabase Edge Function and set VITE_SUPABASE_FUNCTIONS_URL for real analysis.
-                  </p>
-                )}
               </div>
             </Card>
           </div>
