@@ -470,4 +470,66 @@
 
   /* Ensure highlights are visible within prose constraints */
   .prose .ai-highlight { max-width: 100%; }
+
+  /* === Professional A4 CV sheet for PDF/export === */
+  .cv-pdf-sheet {
+    width: 210mm;               /* A4 width */
+    min-height: 297mm;          /* A4 height */
+    padding: 18mm 18mm 20mm;    /* inner margins */
+    background: #ffffff;        /* pure white */
+    color: #222222;             /* readable text */
+    margin: 0 auto;             /* center on screen */
+    border-radius: 4px;         /* subtle rounding for screen */
+  }
+
+  @media screen {
+    .cv-pdf-sheet {
+      box-shadow: 0 6px 24px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.06);
+    }
+  }
+
+  .cv-typography {
+    font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+    line-height: 1.5;
+    letter-spacing: 0.1px;
+  }
+
+  .cv-typography h1,
+  .cv-typography h2,
+  .cv-typography h3 {
+    color: #111827;             /* gray-900 */
+    margin: 0 0 8px;
+  }
+
+  .cv-typography h1 { font-size: 22pt; font-weight: 800; letter-spacing: -0.3px; }
+  .cv-typography h2 { font-size: 14pt; font-weight: 700; margin-top: 14pt; border-bottom: 1px solid #e5e7eb; padding-bottom: 4pt; }
+  .cv-typography h3 { font-size: 11pt; font-weight: 700; }
+
+  .cv-typography p { font-size: 10pt; margin: 0 0 6pt; }
+  .cv-typography ul { margin: 6pt 0 8pt 18pt; }
+  .cv-typography li { margin: 0 0 4pt; font-size: 10pt; }
+
+  .cv-meta-row { display: grid; grid-template-columns: 1fr auto; gap: 8pt; align-items: baseline; }
+  .cv-muted { color: #6b7280; }  /* gray-500 */
+
+  /* Ensure images/tables fit */
+  .cv-pdf-sheet * { max-width: 100%; }
+
+  /* Page-break hints for long content when printing */
+  .page-break { page-break-after: always; }
+
+  @media print {
+    body { background: #ffffff !important; }
+    .cv-pdf-sheet { box-shadow: none !important; margin: 0 !important; }
+  }
+
+  /* Improve docx preview and CV HTML blocks inside sheet */
+  .cv-content-prose {
+    /* Tailwind prose-like spacing without plugin */
+    font-size: 10pt;
+  }
+  .cv-content-prose p { margin: 0 0 6pt; }
+  .cv-content-prose h1 { font-size: 22pt; margin: 0 0 8pt; }
+  .cv-content-prose h2 { font-size: 14pt; margin: 14pt 0 6pt; border-bottom: 1px solid #e5e7eb; padding-bottom: 4pt; }
+  .cv-content-prose h3 { font-size: 11pt; margin: 10pt 0 4pt; }
 }

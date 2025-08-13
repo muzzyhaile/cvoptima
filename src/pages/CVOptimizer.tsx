@@ -61,6 +61,16 @@ const CVOptimizer = () => {
   const [openAIConnected, setOpenAIConnected] = useState<boolean | null>(true);
   const cvPreviewRef = useRef<HTMLDivElement>(null);
   const docxViewerRef = useRef<HTMLDivElement>(null);
+  const pdfContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Build clean HTML (no highlight spans) for export/print
+  const getExportHtml = () => {
+    const base = optimizedCVHtml || buildBaseHtml(cvText, cvHtml);
+    // Remove any highlight wrappers to avoid colored blocks in PDF
+    const clean = stripExistingHighlights(base)
+      .replace(/<span[^>]*class=\"[^\"]*ai-highlight[^\"]*\"[^>]*>([\s\S]*?)<\/span>/gi, "$1");
+    return clean;
+  };
 
   // UseEffect to render Word document when buffer and ref are ready
   useEffect(() => {
@@ -529,64 +539,71 @@ const CVOptimizer = () => {
     }
   };
 
-  const downloadAsPDF = async () => {
+  const downloadAsText = () => {
     try {
-      if (!cvPreviewRef.current) return;
-      
-      const canvas = await html2canvas(cvPreviewRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      pdf.save(`${originalFileName || 'optimized-cv'}.pdf`);
-      
-      toast({
-        title: "CV downloaded as PDF",
-        description: "Your optimized CV has been downloaded as a PDF.",
-      });
-    } catch (error) {
-      console.error('Error creating PDF:', error);
-      toast({
-        title: "Download failed",
-        description: "Failed to create PDF. Please try again.",
-        variant: "destructive",
-      });
+      const content = (optimizedCV && optimizedCV.trim().length > 0) ? optimizedCV : cvText;
+      const blob = new Blob([content || ""], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${originalFileName || 'optimized-cv'}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Text downloaded", description: "Your CV has been saved as a .txt file." });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Download failed", description: "Could not generate the text file.", variant: "destructive" });
     }
   };
 
-  const downloadAsText = () => {
-    const element = document.createElement("a");
-    const file = new Blob([optimizedCV], { type: "text/plain" });
-    element.href = URL.createObjectURL(file);
-    element.download = `${originalFileName || 'optimized-cv'}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-    
-    toast({
-      title: "CV downloaded as text",
-      description: "Your optimized CV has been downloaded as a text file.",
-    });
+  const downloadAsPDF = async () => {
+    try {
+      const container = pdfContainerRef.current;
+      if (!container) throw new Error("PDF container not found");
+
+      // Inject export HTML into hidden A4 container for consistent rendering
+      container.innerHTML = getExportHtml();
+
+      const node = container;
+      const scale = 3; // higher scale for crisper text
+      const canvas = await html2canvas(node, {
+        scale,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ unit: "mm", format: "a4" });
+
+      const pageWidth = 210; // A4 width in mm
+      const pageHeight = 297; // A4 height in mm
+
+      const imgWidth = pageWidth;
+      const imgHeight = (canvas.height * pageWidth) / canvas.width;
+
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        pdf.addPage();
+        position = heightLeft - imgHeight; // move up by remaining height
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight, undefined, "FAST");
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save("optimized-cv.pdf");
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Export failed", description: "Could not generate PDF. Please try again." });
+    }
   };
 
   const getStepProgress = () => {
@@ -1085,6 +1102,17 @@ const CVOptimizer = () => {
 
         {/* Step Content */}
         {renderStepContent()}
+
+        {/* Hidden A4 export container used only for PDF rendering */}
+        <div className="mx-auto">
+          <div
+            className="cv-pdf-sheet cv-typography cv-content-prose"
+            ref={pdfContainerRef}
+            style={{ position: 'absolute', left: '-10000px', top: 0, visibility: 'hidden' }}
+          >
+            {/* populated dynamically during export */}
+          </div>
+        </div>
       </div>
     </div>
   );
